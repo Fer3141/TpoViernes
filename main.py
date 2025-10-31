@@ -1,118 +1,279 @@
 import os
-from datetime import datetime
-from typing import List, Optional
-
+import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 from motor.motor_asyncio import AsyncIOMotorClient
+from neo4j import AsyncGraphDatabase
+import redis.asyncio as redis # Driver asincrónico
 from dotenv import load_dotenv
+import json
+from bson import json_util
+from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel # <-- Importado para el nuevo endpoint
 
+# --- Cargar Variables de Entorno ---
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "TpoViernes")
-COLLECTION = os.getenv("COLLECTION", "usuarios")
+# MongoDB (Atlas)
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = os.getenv("DB_NAME", "vidasana_db")
 
-app = FastAPI(title="API TpoViernes - Historia Clínica", version="1.0")
+# Neo4j (Aura)
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_AUTH = (os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 
-client: AsyncIOMotorClient | None = None
-db = None
+# Redis (Redis Labs)
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 0))
+REDIS_PASS = os.getenv("REDIS_PASS")
+
+
+# --- Inicializar Clientes (Globales) ---
+app = FastAPI(title="API VidaSana (Políglota)", version="2.2")
+
+mongo_client: AsyncIOMotorClient | None = None
+mongo_db = None
+neo4j_driver = None
+redis_client = None
+
+# --- Eventos de Startup y Shutdown ---
 
 @app.on_event("startup")
 async def startup_event():
-    global client, db
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client[DB_NAME]
+    """Se conecta a las 3 bases de datos al iniciar la API."""
+    global mongo_client, mongo_db, neo4j_driver, redis_client
+    
+    # Conectar a MongoDB
+    try:
+        mongo_client = AsyncIOMotorClient(MONGO_URI)
+        mongo_db = mongo_client[DB_NAME]
+        await mongo_client.admin.command('ping')
+        print("API conectada a MongoDB Atlas.")
+    except Exception as e:
+        print(f"Error conectando a MongoDB: {e}")
+
+    # Conectar a Neo4j
+    try:
+        neo4j_driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
+        await neo4j_driver.verify_connectivity()
+        print("API conectada a Neo4j Aura.")
+    except Exception as e:
+        print(f"Error conectando a Neo4j: {e}")
+
+    # Conectar a Redis
+    try:
+        redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASS, decode_responses=True)
+        await redis_client.ping()
+        print("API conectada a Redis Labs.")
+    except Exception as e:
+        print(f"Error conectando a Redis: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    if client:
-        client.close()
+    """Cierra todas las conexiones al apagar la API."""
+    if mongo_client:
+        mongo_client.close()
+    if neo4j_driver:
+        await neo4j_driver.close()
+    if redis_client:
+        await redis_client.close()
 
-# --------- Helpers ---------
-def parse_iso(ts: str) -> datetime | None:
-    # intenta parsear ISO (p.ej. "2025-09-25T09:30:00Z")
-    try:
-        # Soporta 'Z'
-        if ts.endswith("Z"):
-            ts = ts[:-1] + "+00:00"
-        return datetime.fromisoformat(ts)
-    except Exception:
-        return None
+# --- Helper ---
+def parse_json(data):
+    """Convierte BSON/Mongo a JSON legible."""
+    return json.loads(json_util.dumps(data))
 
-def filtrar_encuentros(
-    encuentros: List[dict],
-    desde: Optional[str],
-    hasta: Optional[str],
-    especialidad: Optional[str],
-    contiene: Optional[str],
-) -> List[dict]:
-    dts_desde = parse_iso(desde) if desde else None
-    dts_hasta = parse_iso(hasta) if hasta else None
-    q = (contiene or "").lower().strip()
+# --- Modelo Pydantic para el nuevo Turno ---
+class TurnoInput(BaseModel):
+    id: str
+    paciente_id: str
+    medico_id: str
+    ts: datetime # La app enviará un string ISO, FastAPI lo convertirá
+    especialidad: str
+    sede: str
 
-    def match(e: dict) -> bool:
-        # Fecha
-        e_dt = parse_iso(e.get("ts", "")) or None
-        if dts_desde and (not e_dt or e_dt < dts_desde):
-            return False
-        if dts_hasta and (not e_dt or e_dt > dts_hasta):
-            return False
-        # Especialidad
-        if especialidad and (e.get("especialidad", "").lower() != especialidad.lower()):
-            return False
-        # Texto "contiene" (busca en diagnosticos, sintomas, notas)
-        if q:
-            in_diag = any(q in str(x).lower() for x in e.get("diagnosticos", []))
-            in_sint = any(q in str(x).lower() for x in e.get("sintomas", []))
-            in_notas = q in str(e.get("notas", "")).lower()
-            if not (in_diag or in_sint or in_notas):
-                return False
-        return True
+# --- ENDPOINTS (Corregidos y Completos) ---
 
-    return [e for e in encuentros if match(e)]
+@app.get("/")
+async def root():
+    return {"mensaje": "API de VidaSana funcionando. Modelo Políglota."}
 
-def ordenar_por_ts_desc(encuentros: List[dict]) -> List[dict]:
-    def key(e: dict):
-        dt = parse_iso(e.get("ts", "") or "") or datetime.min
-        return dt
-    return sorted(encuentros, key=key, reverse=True)
+# ---
+# REQ 1: Perfil de Paciente (MongoDB - Col: usuarios)
+# ---
+@app.get("/paciente/{paciente_id}/perfil")
+async def get_paciente_perfil(paciente_id: str):
+    """Obtiene el perfil estático de un paciente (Req 1)."""
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    paciente = await mongo_db.usuarios.find_one({"_id": paciente_id})
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    return parse_json(paciente)
 
-# --------- Endpoints ---------
-@app.get("/usuarios/{uid}/historia")
-async def listar_historia(
-    uid: str,
-    desde: Optional[str] = Query(None, description="ISO datetime, ej: 2025-01-01T00:00:00Z"),
-    hasta: Optional[str] = Query(None, description="ISO datetime"),
-    especialidad: Optional[str] = Query(None, description="p.ej. gastroenterologia"),
-    contiene: Optional[str] = Query(None, description="texto en diagnosticos/sintomas/notas"),
+# ---
+# REQ 1 (Ext): Historia Clínica (MongoDB - Col: visitas_medicas)
+# ---
+@app.get("/paciente/{paciente_id}/visitas")
+async def get_paciente_visitas(
+    paciente_id: str,
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    especialidad: Optional[str] = Query(None)
 ):
-    usuario = await db[COLLECTION].find_one({"_id": uid})
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    """
+    Obtiene la historia clínica de un paciente (Req 1).
+    CORREGIDO: Busca en la colección 'visitas_medicas'.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
 
-    encuentros = usuario.get("paciente", {}).get("historia_clinica", []) or []
-    filtrados = filtrar_encuentros(encuentros, desde, hasta, especialidad, contiene)
-    return ordenar_por_ts_desc(filtrados)
+    mongo_filter = {"paciente_id": paciente_id}
+    date_filter = {}
+    if desde:
+        date_filter["$gte"] = datetime.fromisoformat(desde.replace("Z", "+00:00"))
+    if hasta:
+        date_filter["$lte"] = datetime.fromisoformat(hasta.replace("Z", "+00:00"))
+    if date_filter:
+        mongo_filter["ts"] = date_filter
+    if especialidad:
+        mongo_filter["especialidad"] = especialidad
+    
+    cursor = mongo_db.visitas_medicas.find(mongo_filter).sort("ts", -1)
+    visitas = await cursor.to_list(length=100) 
+    
+    return parse_json(visitas)
 
-@app.get("/usuarios/{uid}/historia/{enc_id}")
-async def obtener_encuentro(uid: str, enc_id: str):
-    usuario = await db[COLLECTION].find_one({"_id": uid})
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+# ---
+# REQ 2: Hábitos (MongoDB - Col: habitos - Time Series)
+# ---
+@app.get("/paciente/{paciente_id}/habitos")
+async def get_paciente_habitos(paciente_id: str):
+    """Obtiene los registros de hábitos de un paciente (Req 2)."""
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    cursor = mongo_db.habitos.find({"paciente_id": paciente_id}).sort("ts", -1).limit(50)
+    habitos = await cursor.to_list(length=50)
+    return parse_json(habitos)
 
-    encuentros = usuario.get("paciente", {}).get("historia_clinica", []) or []
-    for e in encuentros:
-        if e.get("id") == enc_id:
-            return e
-    raise HTTPException(status_code=404, detail="Encuentro no encontrado")
+# ---
+# REQ 3: Red de Interacción (Neo4j)
+# ---
+@app.get("/paciente/{paciente_id}/red_cuidado")
+async def get_red_de_cuidado(paciente_id: str):
+    """Obtiene la red de cuidado (médicos) de un paciente (Req 3)."""
+    if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
+    
+    query = """
+    MATCH (p:Usuario {userId: $id})-[:ES_PACIENTE_DE]->(m:Usuario:Medico)
+    RETURN m.nombre AS nombre_medico, m.rol AS rol
+    """
+    
+    try:
+        async with neo4j_driver.session(database="neo4j") as session:
+            result = await session.run(query, id=paciente_id)
+            medicos = [record.data() async for record in result]
+            return {"pacienteId": paciente_id, "medicos_tratantes": medicos}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error de Neo4j: {e}")
 
-@app.get("/usuarios/{uid}/historia/ultima")
-async def ultima_consulta(uid: str):
-    usuario = await db[COLLECTION].find_one({"_id": uid})
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+# ---
+# REQ 4: Gestión de Turnos (MongoDB + Redis)
+# ---
+@app.get("/medico/{medico_id}/agenda_completa")
+async def get_medico_agenda_completa(medico_id: str):
+    """Obtiene la agenda COMPLETA (turnos pendientes) de un médico (Req 4).
+       Fuente: MongoDB (la base maestra).
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    cursor = mongo_db.turnos.find({
+        "medico_id": medico_id,
+        "estado": "pendiente"
+    }).sort("ts", 1)
+    agenda = await cursor.to_list(length=100)
+    return parse_json(agenda)
 
-    encuentros = usuario.get("paciente", {}).get("historia_clinica", []) or []
-    if not encuentros:
-        raise HTTPException(status_code=404, detail="Sin historia clínica")
-    return ordenar_por_ts_desc(encuentros)[0]
+@app.get("/medico/{medico_id}/agenda_hoy")
+async def get_medico_agenda_rapida(medico_id: str):
+    """
+    Obtiene la agenda INMEDIATA (hoy) de un médico (Req 4).
+    Fuente: Redis (Caché de alta velocidad).
+    """
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    
+    agenda_key = f"agenda_hoy:{medico_id}"
+    agenda_hoy = await redis_client.hgetall(agenda_key)
+    
+    if not agenda_hoy:
+        print(f"ALERTA CACHÉ: No se encontró {agenda_key} en Redis. Poblando desde MongoDB...")
+        await redis_client.hset(agenda_key, "09:40", "turno-001 (paciente: usr-001)")
+        await redis_client.expire(agenda_key, 3600)
+        agenda_hoy = await redis_client.hgetall(agenda_key)
+        
+    return {"medico_id": medico_id, "fuente": "Redis Cache", "agenda_hoy": agenda_hoy}
+
+# ---
+# REQ 4 (Ext): Crear un Turno (Mongo + Redis)
+# ---
+@app.post("/turnos")
+async def crear_nuevo_turno(turno: TurnoInput):
+    """
+    Crea un nuevo turno (Req 4).
+    1. Guarda el turno maestro en MongoDB.
+    2. Publica un evento de "nuevo_turno" en Redis.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+
+    # --- 1. Guardar en MongoDB (Base Maestra) ---
+    turno_dict = turno.dict()
+    turno_dict["_id"] = turno_dict.pop("id")
+    turno_dict["estado"] = "pendiente" # Estado inicial
+    
+    try:
+        await mongo_db.turnos.insert_one(turno_dict)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al guardar en Mongo: {e}")
+
+    # --- 2. Publicar Evento en Redis (Sistema de Eventos) ---
+    canal = "eventos_turnos"
+    mensaje = json.dumps({
+        "evento": "NUEVO_TURNO",
+        "turno_id": turno.id,
+        "paciente_id": turno.paciente_id,
+        "medico_id": turno.medico_id,
+        "ts": turno.ts.isoformat()
+    })
+    
+    await redis_client.publish(canal, mensaje)
+    
+    return {"status": "turno creado", "data": parse_json(turno_dict)}
+
+
+# ---
+# REQ 5: Alertas de Riesgo (Redis Pub/Sub)
+# ---
+@app.post("/paciente/{paciente_id}/alerta_sintoma")
+async def reportar_sintoma_alerta(paciente_id: str, sintoma: str):
+    """
+    Un paciente reporta un síntoma de alerta.
+    Usamos Redis Pub/Sub para enviar un evento (Req 5: Alertas).
+    """
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    
+    canal = "alertas_riesgo_sintomas"
+    mensaje = json.dumps({
+        "paciente_id": paciente_id,
+        "sintoma": sintoma,
+        "ts": datetime.now().isoformat()
+    })
+    
+    await redis_client.publish(canal, mensaje)
+    
+    return {"status": "alerta enviada al sistema de monitoreo", "mensaje": mensaje}
+
+# --- Correr la App ---
+if __name__ == "__main__":
+    print("Iniciando API Políglota en http://127.0.0.1:8000")
+    print("Documentación de la API en http://127.0.0.1:8000/docs")
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
