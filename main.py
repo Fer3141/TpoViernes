@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Query#permisos comentario
+from fastapi import FastAPI, HTTPException, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
