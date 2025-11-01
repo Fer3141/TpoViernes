@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from schemas.user import UsuarioInput, UsuarioUpdate
+from routers import visita_router
 # --- Cargar Variables de Entorno ---
 load_dotenv()
 
@@ -278,6 +279,10 @@ async def patch_usuario(user_id: str, usuario_update: UsuarioUpdate):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error inesperado al actualizar en Mongo: {e}")
+    
+
+
+app.include_router(visita_router.router)
 # ---
 # REQ 4: Gestión de Turnos (MongoDB + Redis)
 # ---
