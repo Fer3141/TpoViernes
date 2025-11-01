@@ -14,6 +14,7 @@ from schemas.user import UsuarioInput, UsuarioUpdate
 from schemas.habito import HabitoInput
 from routers import visita_router
 from routers import habito_router
+from services import scoring_service
 # --- Cargar Variables de Entorno ---
 load_dotenv()
 
@@ -199,7 +200,7 @@ async def get_red_de_cuidado(paciente_id: str):
 async def crear_nuevo_usuario(usuario: UsuarioInput):
     """
     Crea un nuevo usuario (Paciente o Médico) y maneja la estructura de roles.
-    Adaptado para aceptar el JSON simplificado (pass, pii, medico plano).
+    ¡AÑADIDO! Calcula y almacena el score de riesgo inicial si es un PACIENTE.
     """
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
 
@@ -213,15 +214,41 @@ async def crear_nuevo_usuario(usuario: UsuarioInput):
         # Convierte 'password' (interno) a 'pass' (Mongo)
         usuario_dict['auth']['pass'] = usuario_dict['auth'].pop('password')
         
-    # --- 3. Guardar en MongoDB ---
+    # --- 2. Guardar en MongoDB ---
     try:
         resultado = await mongo_db.usuarios.insert_one(usuario_dict)
-        return {"status": "usuario creado", "id": str(resultado.inserted_id), "data": parse_json(usuario_dict)}
     except Exception as e:
         if hasattr(e, 'code') and e.code == 11000:
             raise HTTPException(status_code=400, detail=f"Error al guardar: Ya existe un usuario con el ID {usuario.id}.")
         raise HTTPException(status_code=500, detail=f"Error inesperado al guardar en Mongo: {e}")
 
+    
+    # --- ¡NUEVA LÓGICA! Calcular Riesgo Inicial si es un Paciente (Req 5) ---
+    score_status = {"score_calculado": False}
+    if "PACIENTE" in usuario_dict.get('roles', []):
+        try:
+            paciente_id = usuario_dict["_id"]
+            score_result = await scoring_service.calcular_score_riesgo(mongo_db, paciente_id)
+            score_status = {
+                "score_calculado": True,
+                "riesgo_inicial": score_result.get("riesgo_calculado"),
+                "score_valor": score_result.get("score_riesgo")
+            }
+        except HTTPException as e:
+            print(f"Advertencia: No se pudo calcular el score de riesgo para {paciente_id} al crear: {e.detail}")
+        except Exception as e:
+            print(f"Error inesperado al calcular score de riesgo para {paciente_id}: {e}")
+    # ------------------------------------------------------------------------
+    
+    # Obtener el documento final con el score almacenado para la respuesta
+    final_document = await mongo_db.usuarios.find_one({"_id": usuario_dict["_id"]})
+
+    return {
+        "status": "usuario creado", 
+        "id": str(resultado.inserted_id), 
+        "data": parse_json(final_document),
+        "scoring_reporte": score_status
+    }
 # ---
 # REQ 1.2: Actualizar Parcialmente un Usuario (MongoDB - PATCH)
 # ---
