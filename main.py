@@ -9,7 +9,7 @@ import json
 from bson import json_util
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel # <-- Importado para el nuevo endpoint
+from pydantic import BaseModel, Field
 
 # --- Cargar Variables de Entorno ---
 load_dotenv()
@@ -91,6 +91,71 @@ class TurnoInput(BaseModel):
     ts: datetime # La app enviará un string ISO, FastAPI lo convertirá
     especialidad: str
     sede: str
+
+
+# --- Modelos Pydantic ADAPTADOS al JSON del usuario (Soporte Multiroles) ---
+
+class PIIModel(BaseModel):
+    """Acepta el campo 'pii' a nivel superior del documento."""
+    dni: str
+    nombre: str
+    email: str
+    telefono: str
+    direccion: str
+    fecha_nac: str
+    genero: str
+    pais: str
+
+class HorarioModel(BaseModel):
+    """Horarios de atención."""
+    dia: str
+    inicio: str 
+    fin: str 
+
+class CentroModel(BaseModel):
+    """Centro de atención y sus horarios."""
+    nombre: str
+    horarios: List[HorarioModel] = []
+
+class MedicoModel(BaseModel):
+    """ADAPTADO: Acepta los campos directamente bajo 'medico' (sin 'perfil')."""
+    matricula: str
+    especialidad: List[str] 
+    centros: List[CentroModel] = []
+
+# Modelos de Paciente (Definidos para el caso de rol PACIENTE completo)
+class PacienteClinicoModel(BaseModel):
+    grupo_sanguineo: str
+    alergias: List[str] = []
+    antecedentes: List[str] = []
+
+class PacienteModel(BaseModel):
+    """Estructura de paciente completa (si es enviada)."""
+    obra_social: str
+    numero_afiliado: str
+    clinico: PacienteClinicoModel
+    ultima_consulta_id: str
+    riesgos_activos_count: int = 0
+    habitos_ultima_actualizacion: str
+
+
+class AuthModel(BaseModel):
+    """ADAPTADO: Pydantic lee el campo 'pass' del JSON como 'password'."""
+    username: str
+    password: str = Field(alias='pass') # <-- Pydantic lee el campo "pass" en el JSON
+
+
+class UsuarioInput(BaseModel):
+    """
+    Modelo maestro que soporta cualquier combinación de roles (PACIENTE, MEDICO, AMBOS).
+    """
+    id: str 
+    auth: AuthModel
+    roles: List[str] 
+    pii: PIIModel # <-- Acepta el campo 'pii' a nivel superior
+    paciente: Optional[PacienteModel] = None 
+    medico: Optional[MedicoModel] = None
+
 
 # --- ENDPOINTS (Corregidos y Completos) ---
 
@@ -175,6 +240,46 @@ async def get_red_de_cuidado(paciente_id: str):
             return {"pacienteId": paciente_id, "medicos_tratantes": medicos}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error de Neo4j: {e}")
+
+
+# ---
+# REQ 1 (Ext): Crear un nuevo Usuario (MongoDB)
+# ---
+@app.post("/usuarios")
+async def crear_nuevo_usuario(usuario: UsuarioInput):
+    """
+    Crea un nuevo usuario (Paciente o Médico) y maneja la estructura de roles.
+    Adaptado para aceptar el JSON simplificado (pass, pii, medico plano).
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+
+    # exclude_none=True elimina los campos 'paciente' o 'medico' si no se envían
+    usuario_dict = usuario.dict(exclude_none=True) 
+    
+    usuario_dict["_id"] = usuario_dict.pop("id")
+    
+    # --- 1. Remapeo de 'pass' ---
+    if 'auth' in usuario_dict and 'password' in usuario_dict['auth']:
+        # Convierte 'password' (interno) a 'pass' (Mongo)
+        usuario_dict['auth']['pass'] = usuario_dict['auth'].pop('password')
+        
+    # --- 2. Anidamiento de 'perfil' (Solo si hay datos de médico) ---
+    if usuario_dict.get('medico'):
+        # Si 'matricula' existe, significa que los datos están planos y necesitan anidamiento 'perfil'
+        if 'matricula' in usuario_dict['medico']:
+            medico_data = usuario_dict['medico']
+            # Creamos el anidamiento requerido para la consistencia de Mongo
+            usuario_dict['medico'] = {'perfil': medico_data}
+
+    # --- 3. Guardar en MongoDB ---
+    try:
+        resultado = await mongo_db.usuarios.insert_one(usuario_dict)
+        return {"status": "usuario creado", "id": str(resultado.inserted_id), "data": parse_json(usuario_dict)}
+    except Exception as e:
+        if hasattr(e, 'code') and e.code == 11000:
+            raise HTTPException(status_code=400, detail=f"Error al guardar: Ya existe un usuario con el ID {usuario.id}.")
+        raise HTTPException(status_code=500, detail=f"Error inesperado al guardar en Mongo: {e}")
+
 
 # ---
 # REQ 4: Gestión de Turnos (MongoDB + Redis)
