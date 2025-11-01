@@ -118,25 +118,26 @@ class CentroModel(BaseModel):
     horarios: List[HorarioModel] = []
 
 class MedicoModel(BaseModel):
-    """ADAPTADO: Acepta los campos directamente bajo 'medico' (sin 'perfil')."""
-    matricula: str
-    especialidad: List[str] 
-    centros: List[CentroModel] = []
+    matricula: Optional[str] = None 
+    especialidad: Optional[List[str]] = None 
+    centros: Optional[List[CentroModel]] = None
 
 # Modelos de Paciente (Definidos para el caso de rol PACIENTE completo)
 class PacienteClinicoModel(BaseModel):
-    grupo_sanguineo: str
-    alergias: List[str] = []
-    antecedentes: List[str] = []
+    """Campos anidados del paciente, adaptados a Optional."""
+    grupo_sanguineo: Optional[str] = None
+    alergias: Optional[List[str]] = None
+    antecedentes: Optional[List[str]] = None
 
 class PacienteModel(BaseModel):
-    """Estructura de paciente completa (si es enviada)."""
-    obra_social: str
-    numero_afiliado: str
-    clinico: PacienteClinicoModel
-    ultima_consulta_id: str
-    riesgos_activos_count: int = 0
-    habitos_ultima_actualizacion: str
+    """Estructura de paciente completa, adaptada a Optional."""
+    obra_social: Optional[str] = None
+    numero_afiliado: Optional[str] = None
+    clinico: Optional[PacienteClinicoModel] = None
+    ultima_consulta_id: Optional[str] = None
+    riesgos_activos_count: Optional[int] = None
+    habitos_ultima_actualizacion: Optional[str] = None
+    
 
 
 class AuthModel(BaseModel):
@@ -156,6 +157,19 @@ class UsuarioInput(BaseModel):
     paciente: Optional[PacienteModel] = None 
     medico: Optional[MedicoModel] = None
 
+# --- Modelo Pydantic para PATCH (Todos los campos opcionales) ---
+class UsuarioUpdate(BaseModel):
+    """
+    Modelo usado para PATCH. Hace que todos los campos del UsuarioInput 
+    sean opcionales, permitiendo actualizaciones parciales.
+    """
+    # Mantenemos las mismas estructuras anidadas pero las hacemos opcionales.
+    auth: Optional[AuthModel] = None
+    roles: Optional[List[str]] = None
+    pii: Optional[PIIModel] = None
+    paciente: Optional[PacienteModel] = None
+    medico: Optional[MedicoModel] = None
+    # No incluimos 'id' ya que se toma de la URL
 
 # --- ENDPOINTS (Corregidos y Completos) ---
 
@@ -263,14 +277,6 @@ async def crear_nuevo_usuario(usuario: UsuarioInput):
         # Convierte 'password' (interno) a 'pass' (Mongo)
         usuario_dict['auth']['pass'] = usuario_dict['auth'].pop('password')
         
-    # --- 2. Anidamiento de 'perfil' (Solo si hay datos de médico) ---
-    if usuario_dict.get('medico'):
-        # Si 'matricula' existe, significa que los datos están planos y necesitan anidamiento 'perfil'
-        if 'matricula' in usuario_dict['medico']:
-            medico_data = usuario_dict['medico']
-            # Creamos el anidamiento requerido para la consistencia de Mongo
-            usuario_dict['medico'] = {'perfil': medico_data}
-
     # --- 3. Guardar en MongoDB ---
     try:
         resultado = await mongo_db.usuarios.insert_one(usuario_dict)
@@ -280,7 +286,76 @@ async def crear_nuevo_usuario(usuario: UsuarioInput):
             raise HTTPException(status_code=400, detail=f"Error al guardar: Ya existe un usuario con el ID {usuario.id}.")
         raise HTTPException(status_code=500, detail=f"Error inesperado al guardar en Mongo: {e}")
 
+# ---
+# REQ 1 (Ext): Actualizar Parcialmente un Usuario (MongoDB - PATCH)
+# ---
+@app.patch("/usuarios/{user_id}")
+async def patch_usuario(user_id: str, usuario_update: UsuarioUpdate):
+    """
+    Actualiza parcialmente los campos de un usuario existente por su ID (PATCH).
+    Utiliza dot-notation para apuntar siempre al subdocumento 'medico.perfil'.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
 
+    # exclude_unset=True asegura que solo procesemos los campos que el usuario envió.
+    update_data = usuario_update.dict(exclude_unset=True) 
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar.")
+    
+    mongo_set_operations = {}
+
+    # --- Lógica de Aplanamiento Robusta ---
+    for key, value in update_data.items():
+        if key == 'auth' and value:
+            # Mapeo de 'auth.pass'
+            if value.get('password'):
+                mongo_set_operations['auth.pass'] = value['password']
+            if value.get('username'):
+                mongo_set_operations['auth.username'] = value['username']
+        
+        elif key == 'pii' and value:
+            # Mapeo de 'pii.campo'
+            for pii_key, pii_value in value.items():
+                mongo_set_operations[f'pii.{pii_key}'] = pii_value
+        
+        elif key == 'medico' and value:
+            # CLAVE DE LA SOLUCIÓN: Aplanamiento ROBUSTO a 'medico.perfil.campo'
+            # Esto corrige la corrupción del esquema en todos los documentos.
+            for medico_key, medico_value in value.items():
+                mongo_set_operations[f'medico.{medico_key}'] = medico_value
+        
+        elif key == 'paciente' and value:
+            # Aplanamiento de 'paciente.campo'
+            for pac_key, pac_value in value.items():
+                # Manejar el sub-subdocumento 'clinico'
+                if isinstance(pac_value, dict) and pac_key == 'clinico':
+                    for clinico_key, clinico_value in pac_value.items():
+                         mongo_set_operations[f'paciente.clinico.{clinico_key}'] = clinico_value
+                else:
+                    # Campos directos de paciente (obra_social, riesgos_activos_count, etc.)
+                    mongo_set_operations[f'paciente.{pac_key}'] = pac_value
+                    
+        else:
+            # Para 'roles' y otros campos de nivel superior
+            mongo_set_operations[key] = value
+
+    # --- Ejecutar la actualización parcial usando $set ---
+    try:
+        resultado = await mongo_db.usuarios.update_one(
+            {"_id": user_id},
+            {"$set": mongo_set_operations} 
+        )
+        
+        if resultado.matched_count == 0:
+            raise HTTPException(status_code=404, detail=f"Usuario con ID {user_id} no encontrado")
+        
+        updated_document = await mongo_db.usuarios.find_one({"_id": user_id})
+        
+        return {"status": "usuario actualizado parcialmente", "id": user_id, "data": parse_json(updated_document)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado al actualizar en Mongo: {e}")
 # ---
 # REQ 4: Gestión de Turnos (MongoDB + Redis)
 # ---
