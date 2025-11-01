@@ -10,7 +10,7 @@ from bson import json_util
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
-
+from schemas.user import UsuarioInput, UsuarioUpdate
 # --- Cargar Variables de Entorno ---
 load_dotenv()
 
@@ -92,84 +92,6 @@ class TurnoInput(BaseModel):
     especialidad: str
     sede: str
 
-
-# --- Modelos Pydantic ADAPTADOS al JSON del usuario (Soporte Multiroles) ---
-
-class PIIModel(BaseModel):
-    """Acepta el campo 'pii' a nivel superior del documento."""
-    dni: str
-    nombre: str
-    email: str
-    telefono: str
-    direccion: str
-    fecha_nac: str
-    genero: str
-    pais: str
-
-class HorarioModel(BaseModel):
-    """Horarios de atención."""
-    dia: str
-    inicio: str 
-    fin: str 
-
-class CentroModel(BaseModel):
-    """Centro de atención y sus horarios."""
-    nombre: str
-    horarios: List[HorarioModel] = []
-
-class MedicoModel(BaseModel):
-    matricula: Optional[str] = None 
-    especialidad: Optional[List[str]] = None 
-    centros: Optional[List[CentroModel]] = None
-
-# Modelos de Paciente (Definidos para el caso de rol PACIENTE completo)
-class PacienteClinicoModel(BaseModel):
-    """Campos anidados del paciente, adaptados a Optional."""
-    grupo_sanguineo: Optional[str] = None
-    alergias: Optional[List[str]] = None
-    antecedentes: Optional[List[str]] = None
-
-class PacienteModel(BaseModel):
-    """Estructura de paciente completa, adaptada a Optional."""
-    obra_social: Optional[str] = None
-    numero_afiliado: Optional[str] = None
-    clinico: Optional[PacienteClinicoModel] = None
-    ultima_consulta_id: Optional[str] = None
-    riesgos_activos_count: Optional[int] = None
-    habitos_ultima_actualizacion: Optional[str] = None
-    
-
-
-class AuthModel(BaseModel):
-    """ADAPTADO: Pydantic lee el campo 'pass' del JSON como 'password'."""
-    username: str
-    password: str = Field(alias='pass') # <-- Pydantic lee el campo "pass" en el JSON
-
-
-class UsuarioInput(BaseModel):
-    """
-    Modelo maestro que soporta cualquier combinación de roles (PACIENTE, MEDICO, AMBOS).
-    """
-    id: str 
-    auth: AuthModel
-    roles: List[str] 
-    pii: PIIModel # <-- Acepta el campo 'pii' a nivel superior
-    paciente: Optional[PacienteModel] = None 
-    medico: Optional[MedicoModel] = None
-
-# --- Modelo Pydantic para PATCH (Todos los campos opcionales) ---
-class UsuarioUpdate(BaseModel):
-    """
-    Modelo usado para PATCH. Hace que todos los campos del UsuarioInput 
-    sean opcionales, permitiendo actualizaciones parciales.
-    """
-    # Mantenemos las mismas estructuras anidadas pero las hacemos opcionales.
-    auth: Optional[AuthModel] = None
-    roles: Optional[List[str]] = None
-    pii: Optional[PIIModel] = None
-    paciente: Optional[PacienteModel] = None
-    medico: Optional[MedicoModel] = None
-    # No incluimos 'id' ya que se toma de la URL
 
 # --- ENDPOINTS (Corregidos y Completos) ---
 
@@ -287,7 +209,7 @@ async def crear_nuevo_usuario(usuario: UsuarioInput):
         raise HTTPException(status_code=500, detail=f"Error inesperado al guardar en Mongo: {e}")
 
 # ---
-# REQ 1 (Ext): Actualizar Parcialmente un Usuario (MongoDB - PATCH)
+# REQ 1.2: Actualizar Parcialmente un Usuario (MongoDB - PATCH)
 # ---
 @app.patch("/usuarios/{user_id}")
 async def patch_usuario(user_id: str, usuario_update: UsuarioUpdate):
