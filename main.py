@@ -11,7 +11,9 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from schemas.user import UsuarioInput, UsuarioUpdate
+from schemas.habito import HabitoInput
 from routers import visita_router
+from routers import habito_router
 # --- Cargar Variables de Entorno ---
 load_dotenv()
 
@@ -92,7 +94,18 @@ class TurnoInput(BaseModel):
     ts: datetime # La app enviará un string ISO, FastAPI lo convertirá
     especialidad: str
     sede: str
+    estado: str = "pendiente"
 
+
+class TurnoUpdate(BaseModel):
+    """Modelo para actualizar parcialmente campos de un turno."""
+    # Todos los campos son opcionales
+    ts: Optional[datetime] = None
+    especialidad: Optional[str] = None
+    sede: Optional[str] = None
+    
+    # CLAVE: Campo para cambiar el estado (realizado, cancelado, etc.)
+    estado: Optional[str] = None
 
 # --- ENDPOINTS (Corregidos y Completos) ---
 
@@ -281,8 +294,12 @@ async def patch_usuario(user_id: str, usuario_update: UsuarioUpdate):
         raise HTTPException(status_code=500, detail=f"Error inesperado al actualizar en Mongo: {e}")
     
 
-
+# ---
+# crear visita y habito routers
+# ---
 app.include_router(visita_router.router)
+
+app.include_router(habito_router.router)
 # ---
 # REQ 4: Gestión de Turnos (MongoDB + Redis)
 # ---
@@ -355,6 +372,63 @@ async def crear_nuevo_turno(turno: TurnoInput):
     await redis_client.publish(canal, mensaje)
     
     return {"status": "turno creado", "data": parse_json(turno_dict)}
+
+
+
+# ---
+# REQ 4: Actualizar Parcialmente un Turno (MongoDB - PATCH)
+# ---
+@app.patch("/turnos/{turno_id}")
+async def patch_turno(turno_id: str, turno_update: TurnoUpdate):
+    """
+    Actualiza parcialmente el estado u otros campos de un turno existente (PATCH).
+    Genera un evento en Redis si el estado cambia (Req 4).
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+
+    # exclude_unset=True asegura que solo se procesen los campos que el usuario envió.
+    update_data = turno_update.dict(exclude_unset=True)
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar.")
+
+    # 1. Ejecutar la actualización parcial ($set)
+    try:
+        resultado = await mongo_db.turnos.update_one(
+            {"_id": turno_id},
+            {"$set": update_data} 
+        )
+        
+        if resultado.matched_count == 0:
+            raise HTTPException(status_code=404, detail=f"Turno con ID {turno_id} no encontrado")
+            
+        # Obtener el documento actualizado para la respuesta y el evento
+        updated_document = await mongo_db.turnos.find_one({"_id": turno_id})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado al actualizar el turno en Mongo: {e}")
+
+    # 2. Publicar evento si el estado ha cambiado (Sistema de eventos)
+    if 'estado' in update_data:
+        canal = "eventos_turnos"
+        mensaje = json.dumps({
+            "evento": f"TURNO_{update_data['estado'].upper()}",
+            "turno_id": turno_id,
+            "paciente_id": updated_document.get("paciente_id"),
+            "ts": updated_document.get("ts").isoformat()
+        })
+        
+        await redis_client.publish(canal, mensaje)
+        
+        return {
+            "status": f"turno {update_data['estado']} y evento publicado", 
+            "id": turno_id, 
+            "data": parse_json(updated_document)
+        }
+
+    # Respuesta si se actualizó, pero no se cambió el estado
+    return {"status": "turno actualizado", "id": turno_id, "data": parse_json(updated_document)}
 
 
 # ---
