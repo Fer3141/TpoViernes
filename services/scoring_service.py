@@ -175,3 +175,22 @@ async def calcular_score_riesgo(mongo_db: AsyncIOMotorClient, paciente_id: str):
         "riesgo_calculado": riesgo_calculado,
         "status": "Scoring actualizado y almacenado."
     }
+
+def generar_recomendacion(riesgo_calculado: str, paciente_id: str) -> dict:
+    """
+    Genera una recomendación y una acción sugerida basada en la clasificación de riesgo.
+    """
+    if riesgo_calculado == "ALTO":
+        return {
+            "accion": "Intervención Urgente", 
+            "mensaje": f"El paciente {paciente_id} tiene riesgo ALTO. El sistema recomienda una llamada inmediata y agendar un turno de triage."
+        }
+    if riesgo_calculado == "MODERADO":
+        return {
+            "accion": "Seguimiento Activo", 
+            "mensaje": "El paciente tiene riesgo MODERADO. Se sugiere al médico revisar los hábitos no registrados y enviar recordatorios."
+        }
+    return {
+        "accion": "Monitoreo Estándar", 
+        "mensaje": "Riesgo BAJO. Mantener el seguimiento de hábitos y consultas anuales."
+    }

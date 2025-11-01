@@ -375,6 +375,7 @@ async def crear_nuevo_turno(turno: TurnoInput):
     """
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
 
     # --- 1. Guardar en MongoDB (Base Maestra) ---
     turno_dict = turno.dict()
@@ -398,7 +399,30 @@ async def crear_nuevo_turno(turno: TurnoInput):
     
     await redis_client.publish(canal, mensaje)
     
-    return {"status": "turno creado", "data": parse_json(turno_dict)}
+    try:
+        async with neo4j_driver.session(database="neo4j") as session:
+            # Cypher MERGE: Crea los nodos si no existen y la relación si no existe.
+            # Asumimos que los IDs de paciente y médico están en la colección 'usuarios' de Mongo 
+            # y se mapean a 'Usuario' en Neo4j con la propiedad 'userId'.
+            query = """
+            MERGE (p:Usuario {userId: $paciente_id})
+            MERGE (m:Usuario {userId: $medico_id})
+            MERGE (p)-[:ES_PACIENTE_DE]->(m)
+            """
+            await session.run(query, paciente_id=turno.paciente_id, medico_id=turno.medico_id)
+        
+        neo4j_status = "Relación Neo4j creada/actualizada."
+    except Exception as e:
+        # No es un error crítico para el turno, pero se debe registrar.
+        neo4j_status = f"Advertencia Neo4j: No se pudo crear la relación (Neo4j no conectado o error Cypher): {e}"
+        print(neo4j_status)
+    # ------------------------------------------------------------------
+    
+    return {
+        "status": "turno creado", 
+        "data": parse_json(turno_dict),
+        "red_cuidado_status": neo4j_status # Añadimos el estado para la respuesta
+    }
 
 
 
@@ -413,6 +437,7 @@ async def patch_turno(turno_id: str, turno_update: TurnoUpdate):
     """
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado") # Nueva validación
 
     # exclude_unset=True asegura que solo se procesen los campos que el usuario envió.
     update_data = turno_update.dict(exclude_unset=True)
@@ -436,11 +461,37 @@ async def patch_turno(turno_id: str, turno_update: TurnoUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error inesperado al actualizar el turno en Mongo: {e}")
 
-    # 2. Publicar evento si el estado ha cambiado (Sistema de eventos)
+    # 2. Publicar evento en Redis y actualizar Neo4j (solo si el estado cambia)
+    neo4j_status = "Relación Neo4j no actualizada (Estado no cambiado o no es 'realizado')."
+    
     if 'estado' in update_data:
+        
+        # 2.1. Lógica de Neo4j (Solo si el estado es "realizado")
+        if updated_document.get("estado") == "realizado":
+            try:
+                async with neo4j_driver.session(database="neo4j") as session:
+                    paciente_id = updated_document.get("paciente_id")
+                    medico_id = updated_document.get("medico_id")
+                    
+                    # MERGE/ON MATCH: Refuerza la relación e incrementa el contador de visitas.
+                    query = """
+                    MERGE (p:Usuario {userId: $paciente_id})
+                    MERGE (m:Usuario {userId: $medico_id})
+                    MERGE (p)-[r:ES_PACIENTE_DE]->(m)
+                    ON CREATE SET r.fechaCreacion = timestamp(), r.visitasRealizadas = 1
+                    ON MATCH SET r.ultimaVisita = timestamp(), r.visitasRealizadas = r.visitasRealizadas + 1
+                    """
+                    await session.run(query, paciente_id=paciente_id, medico_id=medico_id)
+                
+                neo4j_status = "Relación Neo4j reforzada (Turno marcado como 'realizado')."
+            except Exception as e:
+                neo4j_status = f"Advertencia Neo4j: No se pudo actualizar la relación con el turno 'realizado': {e}"
+                print(neo4j_status)
+        
+        # 2.2. Publicar evento Redis (Req 4)
         canal = "eventos_turnos"
         mensaje = json.dumps({
-            "evento": f"TURNO_{update_data['estado'].upper()}",
+            "evento": f"TURNO_{updated_document['estado'].upper()}",
             "turno_id": turno_id,
             "paciente_id": updated_document.get("paciente_id"),
             "ts": updated_document.get("ts").isoformat()
@@ -449,13 +500,14 @@ async def patch_turno(turno_id: str, turno_update: TurnoUpdate):
         await redis_client.publish(canal, mensaje)
         
         return {
-            "status": f"turno {update_data['estado']} y evento publicado", 
+            "status": f"turno {updated_document['estado']} y evento publicado", 
             "id": turno_id, 
-            "data": parse_json(updated_document)
+            "data": parse_json(updated_document),
+            "red_cuidado_status": neo4j_status
         }
 
     # Respuesta si se actualizó, pero no se cambió el estado
-    return {"status": "turno actualizado", "id": turno_id, "data": parse_json(updated_document)}
+    return {"status": "turno actualizado", "id": turno_id, "data": parse_json(updated_document), "red_cuidado_status": neo4j_status}
 
 
 # ---
@@ -480,6 +532,39 @@ async def reportar_sintoma_alerta(paciente_id: str, sintoma: str):
     
     return {"status": "alerta enviada al sistema de monitoreo", "mensaje": mensaje}
 
+# ---
+# REQ 5 (Ext): Obtener Recomendación Proactiva
+# ---
+@app.get("/paciente/{paciente_id}/recomendacion")
+async def get_recomendacion_riesgo(paciente_id: str):
+    """
+    Obtiene la última clasificación de riesgo y genera una recomendación proactiva (Req 5).
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    # 1. Obtener el score/riesgo almacenado previamente
+    paciente = await mongo_db.usuarios.find_one(
+        {"_id": paciente_id, "roles": scoring_service.PACIENTE_ROLE}, # Nos aseguramos que sea paciente
+        projection={"paciente.riesgo_calculado": 1, "paciente.score_riesgo": 1} # Solo trae los campos que necesitamos
+    )
+
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado o no tiene rol PACIENTE")
+    
+    paciente_data = paciente.get('paciente', {})
+    riesgo = paciente_data.get('riesgo_calculado', 'N/A')
+    
+    if riesgo == 'N/A':
+         return {"status": "error", "mensaje": "El score de riesgo aún no ha sido calculado para este paciente."}
+    
+    # 2. Generar la recomendación usando la función de servicio
+    recomendacion = scoring_service.generar_recomendacion(riesgo, paciente_id)
+    
+    return {
+        "paciente_id": paciente_id,
+        "riesgo_actual": riesgo,
+        "reporte_recomendacion": recomendacion
+    }
 # --- Correr la App ---
 if __name__ == "__main__":
     print("Iniciando API Políglota en http://127.0.0.1:8000")
