@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard VidaSana</title>
+    <!-- 1. Carga Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Carga los íconos (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Oculta el dashboard hasta que nos logueemos */
+        #dashboard-screen { display: none; }
+        /* Estilo simple para el spinner */
+        #loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen">
+
+    <!-- ======================= -->
+    <!--     PANTALLA DE LOGIN   -->
+    <!-- ======================= -->
+    <div id="login-screen" class="flex items-center justify-center h-full">
+        <form id="login-form" class="p-8 bg-white rounded-lg shadow-xl w-96">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">VidaSana</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario</label>
+                <input id="username" type="text" value="agomez" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
+                <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <!-- Mensaje de Error -->
+            <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+            
+            <div class="flex items-center justify-between">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                    Ingresar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ======================= -->
+    <!--  PANTALLA DE DASHBOARD  -->
+    <!-- ======================= -->
+    <div id="dashboard-screen" class="h-screen flex-col bg-gray-100">
+        <!-- Header -->
+        <header class="flex items-center justify-between p-4 bg-white border-b border-gray-200 shadow-sm">
+            <h1 class="text-2xl font-bold text-sky-700">Dashboard Profesional</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-700 hidden sm:block">
+                    Hola, <span id="user-name" class="font-semibold"></span>
+                </span>
+                <button id="logout-button" class="text-gray-500 hover:text-red-600">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col p-6 overflow-hidden">
+            <!-- Selector de Paciente -->
+            <div class="mb-4">
+                <label for="paciente-select" class="block text-sm font-medium text-gray-700 mb-1">
+                    Seleccionar Paciente
+                </label>
+                <select id="paciente-select" class="w-full max-w-xs p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- Opciones se cargarán con JS -->
+                </select>
+            </div>
+            
+            <!-- Contenido del Paciente -->
+            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
+                <!-- Barra de Pestañas -->
+                <nav class="flex space-x-2 mb-6 border-b border-gray-200">
+                    <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none border-b-2 border-blue-500 text-blue-600">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                        <span>Perfil</span>
+                    </button>
+                    <button data-tab="visitas" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none text-gray-500 hover:text-gray-700">
+                        <i data-lucide="clipboard" class="w-4 h-4"></i>
+                        <span>Visitas</span>
+                    </button>
+                    <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none text-gray-500 hover:text-gray-700">
+                        <i data-lucide="line-chart" class="w-4 h-4"></i>
+                        <span>Hábitos</span>
+                    </button>
+                    <button data-tab="red" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md focus:outline-none text-gray-500 hover:text-gray-700">
+                        <i data-lucide="network" class="w-4 h-4"></i>
+                        <span>Red y Riesgos</span>
+                    </button>
+                </nav>
+
+                <!-- Contenido de la Pestaña -->
+                <div id="loading-spinner" class="mx-auto hidden"></div>
+                <div id="content-error" class="text-red-500 hidden"></div>
+
+                <div id="tab-content">
+                    <div id="perfil-content" class="tab-pane"></div>
+                    <div id="visitas-content" class="tab-pane hidden"></div>
+                    <div id="habitos-content" class="tab-pane hidden"></div>
+                    <div id="red-content" class="tab-pane hidden"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ======================= -->
+    <!--     LÓGICA JAVASCRIPT   -->
+    <!-- ======================= -->
+    <script>
+        // URL de tu API de Python (¡Asegurate de que esté corriendo!)
+        const API_URL = 'http://localhost:8000';
+        let currentToken = null;
+        let currentUser = null;
+
+        // --- Selectores de Elementos ---
+        const loginScreen = document.getElementById('login-screen');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const dashboardScreen = document.getElementById('dashboard-screen');
+        const userName = document.getElementById('user-name');
+        const logoutButton = document.getElementById('logout-button');
+        const pacienteSelect = document.getElementById('paciente-select');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const contentError = document.getElementById('content-error');
+
+        // --- Función de Login ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            loginError.classList.add('hidden');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // 1. Crear el body en el formato 'application/x-www-form-urlencoded'
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            try {
+                // 2. Pedir el token
+                const res = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || 'Usuario o contraseña incorrectos');
+                }
+
+                const tokenData = await res.json();
+                currentToken = tokenData.access_token;
+                localStorage.setItem('vidasana_token', currentToken);
+                
+                await showDashboard();
+
+            } catch (error) {
+                console.error("Error en el login:", error);
+                loginError.textContent = error.message;
+                loginError.classList.remove('hidden');
+            }
+        }
+        
+        // --- Función para Mostrar Dashboard ---
+        async function showDashboard() {
+            if (!currentToken) return;
+            try {
+                // 3. Con el token, pedir los datos del médico logueado ('usr-003' para demo)
+                const userRes = await fetch(`${API_URL}/paciente/usr-003/perfil`, {
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+                if (!userRes.ok) throw new Error('No se pudo obtener el perfil del usuario');
+                
+                currentUser = await userRes.json();
+                userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
+
+                // 4. Mostrar/Ocultar pantallas
+                loginScreen.style.display = 'none';
+                dashboardScreen.style.display = 'flex';
+                
+                // 5. Cargar pacientes (hardcodeado para el demo)
+                const pacientes = [
+                    { id: 'usr-001', nombre: 'Juan Lopez' },
+                    { id: 'usr-002', nombre: 'Maria Lopez' },
+                ];
+                pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+                
+                // 6. Cargar datos del primer paciente
+                await fetchDataForPatient(pacientes[0].id);
+
+            } catch (error) {
+                console.error("Error al mostrar dashboard:", error);
+                handleLogout(); // Si falla, desloguear
+            }
+        }
+
+        // --- Función de Logout ---
+        function handleLogout() {
+            localStorage.removeItem('vidasana_token');
+            currentToken = null;
+            currentUser = null;
+            loginScreen.style.display = 'flex';
+            dashboardScreen.style.display = 'none';
+        }
+
+        // --- Función para Cargar Datos (¡LA MAGIA!) ---
+        async function fetchDataForPatient(pacienteId) {
+            if (!pacienteId) return;
+
+            loadingSpinner.classList.remove('hidden');
+            contentError.classList.add('hidden');
+            tabPanes.forEach(pane => pane.innerHTML = ''); // Limpiar contenido
+            
+            try {
+                // Función helper para llamar a la API
+                const fetchApi = async (url) => {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${currentToken}` }
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || 'Error en la API');
+                    }
+                    return res.json();
+                };
+                
+                // 1. Pedir todos los datos en paralelo
+                const [perfil, visitas, habitos, red, riesgos] = await Promise.all([
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`),
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/visitas`),
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/habitos`),
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/red_cuidado`),
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/familiares_con_riesgo`)
+                ]);
+
+                // 2. "Renderizar" los datos en el HTML
+                renderPerfil(perfil);
+                renderVisitas(visitas);
+                renderHabitos(habitos);
+                renderRed(red, riesgos);
+                
+            } catch (err) {
+                console.error("Error fetching patient data:", err);
+                contentError.textContent = `Error al cargar datos: ${err.message}`;
+                contentError.classList.remove('hidden');
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                // Activar los íconos (lucide)
+                lucide.createIcons();
+            }
+        }
+        
+        // --- Funciones de Renderizado (Puro HTML) ---
+        function renderPerfil(perfil) {
+            const p = perfil.paciente;
+            document.getElementById('perfil-content').innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800">Perfil del Paciente (Req. 1)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold text-gray-800">${perfil.pii?.nombre || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold text-gray-800">${perfil.pii?.dni || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold text-gray-800">${p?.obra_social || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold text-gray-800">${p?.clinico?.alergias?.join(', ') || 'Ninguna'}</p></div>
+                </div>
+            `;
+        }
+        
+        function renderVisitas(visitas) {
+            let html = '<h3 class="text-xl font-semibold text-gray-800">Historia Clínica (Req. 1)</h3>';
+            if (visitas.length === 0) {
+                html += '<p>No hay visitas registradas.</p>';
+            } else {
+                html += `
+                    <table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diagnóstico</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${visitas.map(v => `
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-700">${new Date(v.ts.$date).toLocaleDateString()}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">${v.especialidad}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">${v.diagnosticos?.[0] || 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('visitas-content').innerHTML = html;
+        }
+
+        function renderHabitos(habitos) {
+             let html = '<h3 class="text-xl font-semibold text-gray-800">Seguimiento de Hábitos (Req. 2)</h3>';
+            if (habitos.length === 0) {
+                html += '<p>No hay hábitos registrados.</p>';
+            } else {
+                html += `
+                    <table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${habitos.map(h => `
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-700">${new Date(h.ts.$date).toLocaleString()}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">${h.tipo}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('habitos-content').innerHTML = html;
+        }
+
+        function renderRed(red, riesgos) {
+            let redHtml = 'Sin datos de red.';
+            if (red && red.medicos_tratantes.length > 0) {
+                redHtml = `
+                    <ul class="list-disc list-inside space-y-1">
+                        ${red.medicos_tratantes.map(m => `<li class="text-gray-700">${m.nombre_medico} (${m.rol})</li>`).join('')}
+                    </ul>
+                `;
+            }
+
+            let riesgoHtml = 'Sin riesgos familiares detectados.';
+            if (riesgos && riesgos.familiares_con_riesgo.length > 0) {
+                riesgoHtml = `
+                    <ul class="list-disc list-inside space-y-1">
+                         ${riesgos.familiares_con_riesgo.map(f => `<li class="text-red-600">${f.nombre_familiar}</li>`).join('')}
+                    </ul>
+                `;
+            }
+            
+            document.getElementById('red-content').innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Red de Cuidado (Req. 3)</h3>
+                        <div class="p-4 bg-gray-50 rounded-lg border">
+                            <h4 class="font-semibold mb-2">Médicos Tratantes (Neo4j):</h4>
+                            ${redHtml}
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Riesgos Familiares (Req. 5)</h3>
+                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <h4 class="font-semibold text-red-700 mb-2">Riesgo 'diabetes' en familiares (Neo4j):</h4>
+                            ${riesgoHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Event Listeners (Controladores) ---
+        loginForm.addEventListener('submit', handleLogin);
+        logoutButton.addEventListener('click', handleLogout);
+
+        pacienteSelect.addEventListener('change', (e) => {
+            fetchDataForPatient(e.target.value);
+        });
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                // Ocultar todos
+                tabPanes.forEach(pane => pane.classList.add('hidden'));
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'text-blue-600');
+                    btn.classList.add('text-gray-500', 'hover:text-gray-700');
+                });
+                
+                // Mostrar el seleccionado
+                document.getElementById(`${targetTab}-content`).classList.remove('hidden');
+                button.classList.add('border-blue-500', 'text-blue-600');
+                button.classList.remove('text-gray-500', 'hover:text-gray-700');
+            });
+        });
+
+        // --- Inicialización de la App ---
+        function initApp() {
+            const storedToken = localStorage.getItem('vidasana_token');
+            if (storedToken) {
+                currentToken = storedToken;
+                showDashboard();
+            }
+            // Llama a lucide para renderizar los íconos (ej: <i data-lucide="log-out"></i>)
+            lucide.createIcons();
+        }
+        
+        initApp();
+
+    </script>
+</body>
+</html>
+```
+
+---
+
+### 2. Qué tenés que hacer ahora (El Plan Final)
+
+**Terminal 1 (Backend):**
+1.  Andá a tu carpeta `TpoViernes` (la que tiene el `(venv)`).
+2.  Activá el entorno: `source venv/bin/activate`
+3.  Encendé tu API de Python (que ya tiene CORS gracias al `main.py` que te pasé):
+    ```bash
+    uvicorn main:app --reload
+    
