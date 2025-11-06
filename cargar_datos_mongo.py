@@ -29,7 +29,7 @@ USUARIOS = [
         "obra_social": "OSDE 210",
         "clinico": {"alergias": ["penicilina"]},
         "resumen": {"ultima_visita_id": "enc-002"}
-      }, "medico": None
+      }
     },
     {
       "_id": "usr-002", 
@@ -41,7 +41,7 @@ USUARIOS = [
         "obra_social": "Swiss Medical",
         "clinico": {"antecedentes": ["diabetes"]},
         "resumen": {}
-      }, "medico": None
+      }
     },
     {
       "_id": "usr-003", 
@@ -49,7 +49,6 @@ USUARIOS = [
       "auth": {"username": "agomez", "password_hash": get_password_hash("pass123")}, 
       "roles": ["MEDICO"],
       "pii": {"dni": "25111222", "nombre": "Ana Gomez"},
-      "paciente": None,
       "medico": {"perfil": {"matricula": "MP-12345", "especialidad": "cardiología"}}
     }
 ]

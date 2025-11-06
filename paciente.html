@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Paciente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        #dashboard-screen { display: none; }
+        #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen">
+
+    <div id="login-screen" class="flex items-center justify-center h-full">
+        <form id="login-form" class="p-8 bg-white rounded-lg shadow-xl w-96">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">VidaSana (Paciente)</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario (Paciente)</label>
+                <input id="username" type="text" value="ljuan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
+                <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+            </div>
+            <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+            <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
+        </form>
+    </div>
+
+    <div id="dashboard-screen" class="h-screen flex-col bg-gray-100">
+        <header class="flex items-center justify-between p-4 bg-white border-b shadow-sm">
+            <h1 class="text-2xl font-bold text-blue-800">Mi Portal de Paciente</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-700 hidden sm:block">¡Hola, <span id="user-name" class="font-semibold"></span>!</span>
+                <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+            </div>
+        </header>
+
+        <main class="flex-1 flex flex-col p-6 overflow-hidden">
+            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
+                <nav class="flex space-x-2 mb-6 border-b border-gray-200">
+                    <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-700 text-blue-800"><i data-lucide="user" class="w-4 h-4"></i><span>Mi Perfil</span></button>
+                    <button data-tab="registrar" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="edit" class="w-4 h-4"></i><span>Registrar Hábito</span></button>
+                    <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Mis Hábitos</span></button>
+                    <button data-tab="turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
+                </nav>
+
+                <div id="loading-spinner" class="mx-auto hidden"></div>
+                <div id="content-error" class="text-red-500 hidden"></div>
+
+                <div id="tab-content">
+                    <div id="perfil-content" class="tab-pane"></div>
+                    <div id="registrar-content" class="tab-pane hidden"></div>
+                    <div id="habitos-content" class="tab-pane hidden"></div>
+                    <div id="turnos-content" class="tab-pane hidden"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentToken = null;
+        let currentUser = null; // ¡Guardará el perfil del paciente logueado!
+
+        // --- Selectores ---
+        const loginScreen = document.getElementById('login-screen');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const dashboardScreen = document.getElementById('dashboard-screen');
+        const userName = document.getElementById('user-name');
+        const logoutButton = document.getElementById('logout-button');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const contentError = document.getElementById('content-error');
+
+        // --- Login (Actualizado) ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            loginError.classList.add('hidden');
+            const formData = new URLSearchParams();
+            formData.append('username', document.getElementById('username').value);
+            formData.append('password', document.getElementById('password').value);
+
+            try {
+                // 1. Pedir el token
+                const res = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+                
+                const tokenData = await res.json();
+                currentToken = tokenData.access_token;
+                localStorage.setItem('vidasana_token', currentToken);
+                
+                // 2. Usar el token para pedir info del usuario (¡NUEVO!)
+                const userRes = await fetch(`${API_URL}/usuarios/me`, {
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+                if (!userRes.ok) throw new Error('No se pudo obtener el perfil del usuario');
+                
+                currentUser = await userRes.json();
+
+                // 3. Validar que sea Paciente
+                if (!currentUser.roles.includes("PACIENTE")) {
+                    throw new Error("Acceso denegado. Este portal es solo para PACIENTES.");
+                }
+
+                await showDashboard();
+
+            } catch (error) {
+                console.error("Error en el login:", error);
+                loginError.textContent = error.message;
+                loginError.classList.remove('hidden');
+                handleLogout();
+            }
+        }
+        
+        async function showDashboard() {
+            userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
+            loginScreen.style.display = 'none';
+            dashboardScreen.style.display = 'flex';
+            
+            // Cargar datos del paciente logueado
+            await fetchDataForTab('perfil');
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('vidasana_token');
+            currentToken = null; currentUser = null;
+            loginScreen.style.display = 'flex';
+            dashboardScreen.style.display = 'none';
+        }
+
+        // --- Carga de Datos (Dinámica por Tab) ---
+        async function fetchDataForTab(tabName) {
+            if (!currentUser) return;
+            const pacienteId = currentUser._id;
+            
+            const contentDiv = document.getElementById(`${tabName}-content`);
+            contentDiv.innerHTML = ''; // Limpiar
+            loadingSpinner.classList.remove('hidden');
+            contentError.classList.add('hidden');
+            
+            try {
+                const fetchApi = async (url) => {
+                    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+                    return res.json();
+                };
+                
+                // Cargar datos según la pestaña
+                if (tabName === 'perfil') {
+                    const perfil = await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`);
+                    renderPerfil(perfil);
+                } else if (tabName === 'registrar') {
+                    renderFormHabito();
+                } else if (tabName === 'habitos') {
+                    const habitos = await fetchApi(`${API_URL}/paciente/${pacienteId}/habitos`);
+                    renderHabitos(habitos);
+                } else if (tabName === 'turnos') {
+                    renderFormTurno();
+                }
+
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                contentError.textContent = `Error: ${err.message}`;
+                contentError.classList.remove('hidden');
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                lucide.createIcons();
+            }
+        }
+        
+        // --- Render Perfil (Req 1) ---
+        function renderPerfil(perfil) {
+            const p = perfil.paciente || {};
+            const pii = perfil.pii || {};
+            document.getElementById('perfil-content').innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800">Mi Perfil</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${pii.nombre || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${pii.dni || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold">${p.obra_social || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${p.clinico?.alergias?.join(', ') || 'Ninguna'}</p></div>
+                </div>
+            `;
+        }
+
+        // --- Render Formulario de Hábitos (Req 2) ---
+        function renderFormHabito() {
+            document.getElementById('registrar-content').innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800">Registrar Hábito o Síntoma</h3>
+                <form id="form-habito" class="mt-4 space-y-4 max-w-lg">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tipo de Registro</label>
+                        <select id="habito-tipo" class="mt-1 block w-full p-2 border rounded-md">
+                            <option value="glucosa">Glucosa (mg/dL)</option>
+                            <option value="presion_sistolica">Presión Sistólica (mmHg)</option>
+                            <option value="sueño">Horas de Sueño</option>
+                            <option value="sintoma">Sintoma (Alerta)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Valor o Descripción</label>
+                        <input id="habito-valor" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 110 o 'Dolor de cabeza'">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Notas (Opcional)</label>
+                        <input id="habito-notas" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 'en ayunas'">
+                    </div>
+                    <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded">Registrar</button>
+                    <div id="habito-status" class="text-sm mt-2"></div>
+                </form>
+            `;
+            document.getElementById('form-habito').addEventListener('submit', handleRegistrarHabito);
+        }
+
+        // --- Render Mis Hábitos (Req 2) ---
+        function renderHabitos(habitos) {
+             let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Hábitos Registrados</h3>';
+            if (habitos.length === 0) {
+                html += '<p class="mt-4">Aún no has registrado hábitos.</p>';
+            } else {
+                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                        </tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${habitos.map(h => `
+                                <tr>
+                                    <td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td>
+                                    <td class="px-6 py-4">${h.tipo}</td>
+                                    <td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody></table>`;
+            }
+            document.getElementById('habitos-content').innerHTML = html;
+        }
+
+        // --- Render Formulario de Turno (Req 4) ---
+        function renderFormTurno() {
+            document.getElementById('turnos-content').innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800">Solicitar Turno</h3>
+                <form id="form-turno" class="mt-4 space-y-4 max-w-lg">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Médico (ID)</label>
+                        <select id="turno-medico" class="mt-1 block w-full p-2 border rounded-md">
+                            <option value="usr-003">Dra. Ana Gomez (Cardiología)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Fecha y Hora</label>
+                        <input id="turno-ts" type="datetime-local" class="mt-1 block w-full p-2 border rounded-md">
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700">Sede</label>
+                        <select id="turno-sede" class="mt-1 block w-full p-2 border rounded-md">
+                            <option value="Argentina">Argentina</option>
+                            <option value="Colombia">Colombia</option>
+                            <option value="Uruguay">Uruguay</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded">Solicitar Turno</button>
+                    <div id="turno-status" class="text-sm mt-2"></div>
+                </form>
+            `;
+            document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
+        }
+
+        // --- (¡NUEVO!) Handler Registrar Hábito (Req 2) ---
+        async function handleRegistrarHabito(e) {
+            e.preventDefault();
+            const statusDiv = document.getElementById('habito-status');
+            const tipo = document.getElementById('habito-tipo').value;
+            const valor = document.getElementById('habito-valor').value;
+            const notas = document.getElementById('habito-notas').value;
+
+            // Convertir valor a número si no es un síntoma
+            let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
+            if (isNaN(valorParseado) && tipo !== 'sintoma') {
+                 statusDiv.textContent = 'El valor debe ser numérico.';
+                 statusDiv.className = 'text-sm mt-2 text-red-600';
+                 return;
+            }
+
+            statusDiv.textContent = 'Registrando...';
+            try {
+                const res = await fetch(`${API_URL}/habitos`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        "tipo": tipo,
+                        "valor": valorParseado,
+                        "notas": notas || null
+                    })
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+                
+                statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
+                statusDiv.className = 'text-sm mt-2 text-green-600';
+                e.target.reset(); // Limpiar formulario
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'text-sm mt-2 text-red-600';
+            }
+        }
+
+        // --- (¡NUEVO!) Handler Sacar Turno (Req 4) ---
+        async function handleSacarTurno(e) {
+            e.preventDefault();
+            const statusDiv = document.getElementById('turno-status');
+            const medico_id = document.getElementById('turno-medico').value;
+            const ts = document.getElementById('turno-ts').value;
+            const sede = document.getElementById('turno-sede').value;
+
+            if (!ts) {
+                statusDiv.textContent = 'Debe seleccionar una fecha y hora.';
+                statusDiv.className = 'text-sm mt-2 text-red-600';
+                return;
+            }
+
+            statusDiv.textContent = 'Solicitando...';
+            try {
+                // Generar un ID de turno único (simple)
+                const turno_id = "turno-" + Date.now();
+                const medico_data = document.getElementById('turno-medico').options[0].text; // "Dra. Ana Gomez (Cardiología)"
+                const especialidad = medico_data.split('(')[1].replace(')',''); // "Cardiología"
+
+                const res = await fetch(`${API_URL}/turnos`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        "_id": turno_id,
+                        "paciente_id": currentUser._id, // ¡El ID del paciente logueado!
+                        "medico_id": medico_id,
+                        "ts": new Date(ts).toISOString(),
+                        "especialidad": especialidad,
+                        "sede": sede
+                    })
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+                
+                statusDiv.textContent = `¡Turno solicitado con éxito para ${especialidad}!`;
+                statusDiv.className = 'text-sm mt-2 text-green-600';
+                e.target.reset();
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'text-sm mt-2 text-red-600';
+            }
+        }
+
+        // --- Event Listeners ---
+        loginForm.addEventListener('submit', handleLogin);
+        logoutButton.addEventListener('click', handleLogout);
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                tabPanes.forEach(pane => pane.classList.add('hidden'));
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('border-blue-700', 'text-blue-800');
+                    btn.classList.add('text-gray-500');
+                });
+                
+                document.getElementById(`${targetTab}-content`).classList.remove('hidden');
+                button.classList.add('border-blue-700', 'text-blue-800');
+                
+                // Cargar datos solo cuando se hace clic en la pestaña
+                fetchDataForTab(targetTab);
+            });
+        });
+
+        function initApp() {
+            lucide.createIcons();
+        }
+        initApp();
+    </script>
+</body>
+</html>
