@@ -102,6 +102,23 @@ class UsuarioCreate(BaseModel):
     paciente: Optional[PacienteData] = None
     medico: Optional[MedicoData] = None
 
+# ... (después de la clase UsuarioCreate) ...
+
+class PacienteUpdate(BaseModel):
+    obra_social: Optional[str] = None
+    clinico: Optional[Dict[str, Any]] = None 
+
+# --- (¡NUEVO!) Modelo para Auto-Registro de Paciente ---
+class PacienteRegister(BaseModel):
+    username: str
+    password: str 
+    pii: PII
+    obra_social: Optional[str] = None
+# --- Fin del nuevo modelo ---
+
+class AsignarPaciente(BaseModel):
+    paciente_id: str
+
 class PacienteUpdate(BaseModel):
     obra_social: Optional[str] = None
     clinico: Optional[Dict[str, Any]] = None 
@@ -225,6 +242,70 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+# --- (¡NUEVO!) Endpoint de Auto-Registro Público para Pacientes ---
+@app.post("/register/paciente", status_code=status.HTTP_201_CREATED)
+async def register_paciente(user_in: PacienteRegister):
+    """
+    Permite a un NUEVO paciente registrarse públicamente en el sistema.
+    No requiere autenticación.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
+
+    # 1. Verificar si el usuario o DNI ya existen
+    existing_user = await mongo_db.usuarios.find_one({
+        "$or": [
+            {"auth.username": user_in.username},
+            {"pii.dni": user_in.pii.dni}
+        ]
+    })
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="El nombre de usuario o DNI ya están registrados."
+        )
+
+    # 2. Generar el documento de usuario
+    
+    # Creamos un ID único para el paciente (ej: usr-p-12345678)
+    user_id = f"usr-p-{user_in.pii.dni}"
+    hashed_password = get_password_hash(user_in.password)
+
+    user_doc = {
+        "_id": user_id,
+        "auth": {
+            "username": user_in.username,
+            "password_hash": hashed_password
+        },
+        "roles": ["PACIENTE"], # ¡Rol asignado automáticamente!
+        "pii": user_in.pii.dict(),
+        "paciente": {
+            "obra_social": user_in.obra_social,
+            "clinico": {} # Objeto clínico vacío inicial
+        },
+        "medico": None
+    }
+    
+    # 3. Insertar en MongoDB
+    try:
+        await mongo_db.usuarios.insert_one(user_doc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar en Mongo: {e}")
+
+    # 4. Crear nodo en Neo4j
+    query = """
+    MERGE (u:Usuario:Paciente {userId: $id}) 
+    SET u.nombre = $nombre
+    """
+    try:
+        async with neo4j_driver.session(database="neo4j") as session:
+            await session.run(query, id=user_id, nombre=user_in.pii.nombre)
+    except Exception as e:
+        # (Nota: en producción, aquí manejaríamos un rollback de Mongo si Neo4j falla)
+        raise HTTPException(status_code=500, detail=f"Error al crear nodo en Neo4j: {e}")
+
+    return {"status": "paciente registrado exitosamente", "_id": user_id}
 
 # --- ¡AQUÍ ESTÁ LA CORRECCIÓN 2/2! (en esta función) ---
 @app.get("/usuarios/me")

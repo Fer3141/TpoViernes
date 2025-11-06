@@ -10,24 +10,58 @@
         #dashboard-screen { display: none; }
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Estilos para las pestañas de login/registro */
+        .login-tab.active { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; }
+        .login-tab { border-bottom: 2px solid transparent; }
     </style>
 </head>
 <body class="bg-gray-100 h-screen">
 
     <div id="login-screen" class="flex items-center justify-center h-full">
-        <form id="login-form" class="p-8 bg-white rounded-lg shadow-xl w-96">
-            <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">VidaSana (Paciente)</h2>
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario (Paciente)</label>
-                <input id="username" type="text" value="ljuan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+        <div class="p-8 bg-white rounded-lg shadow-xl w-96">
+            
+            <div class="flex border-b mb-6">
+                <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Ingresar</button>
+                <button id="tab-btn-register" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Registrarse</button>
             </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
-                <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+
+            <div id="login-pane">
+                <form id="login-form">
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">VidaSana (Paciente)</h2>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario</label>
+                        <input id="username" type="text" value="ljuan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
+                        <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+                    </div>
+                    <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+                    <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
+                </form>
             </div>
-            <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
-            <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
-        </form>
+
+            <div id="register-pane" class="hidden">
+                <form id="register-form">
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Crear Cuenta Paciente</h2>
+                    <div class="space-y-4">
+                        <input id="username-reg" type="text" placeholder="Nombre de Usuario" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="password-reg" type="password" placeholder="Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <hr>
+                        <input id="nombre-reg" type="text" placeholder="Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="dni-reg" type="text" placeholder="DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="email-reg" type="email" placeholder="Email" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <div>
+                            <label class="text-sm text-gray-500">Fecha de Nacimiento</label>
+                            <input id="fecha-nac-reg" type="date" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        </div>
+                        <input id="os-reg" type="text" placeholder="Obra Social (Opcional)" class="shadow-sm border rounded w-full py-2 px-3">
+                        <div id="register-status" class="text-sm mb-4 hidden"></div>
+                        <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full">Crear Cuenta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div id="dashboard-screen" class="h-screen flex-col bg-gray-100">
@@ -38,7 +72,6 @@
                 <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
             </div>
         </header>
-
         <main class="flex-1 flex flex-col p-6 overflow-hidden">
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
@@ -47,10 +80,8 @@
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Mis Hábitos</span></button>
                     <button data-tab="turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
                 </nav>
-
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
-
                 <div id="tab-content">
                     <div id="perfil-content" class="tab-pane"></div>
                     <div id="registrar-content" class="tab-pane hidden"></div>
@@ -64,7 +95,7 @@
     <script>
         const API_URL = 'http://localhost:8000';
         let currentToken = null;
-        let currentUser = null; // ¡Guardará el perfil del paciente logueado!
+        let currentUser = null; 
 
         // --- Selectores ---
         const loginScreen = document.getElementById('login-screen');
@@ -77,6 +108,14 @@
         const tabPanes = document.querySelectorAll('.tab-pane');
         const loadingSpinner = document.getElementById('loading-spinner');
         const contentError = document.getElementById('content-error');
+
+        // (¡NUEVO!) Selectores de Login/Registro
+        const tabBtnLogin = document.getElementById('tab-btn-login');
+        const tabBtnRegister = document.getElementById('tab-btn-register');
+        const loginPane = document.getElementById('login-pane');
+        const registerPane = document.getElementById('register-pane');
+        const registerForm = document.getElementById('register-form');
+        const registerStatus = document.getElementById('register-status');
 
         // --- Login (Actualizado) ---
         async function handleLogin(e) {
@@ -99,7 +138,7 @@
                 currentToken = tokenData.access_token;
                 localStorage.setItem('vidasana_token', currentToken);
                 
-                // 2. Usar el token para pedir info del usuario (¡NUEVO!)
+                // 2. Usar el token para pedir info del usuario
                 const userRes = await fetch(`${API_URL}/usuarios/me`, {
                     headers: { 'Authorization': `Bearer ${currentToken}` }
                 });
@@ -119,6 +158,53 @@
                 loginError.textContent = error.message;
                 loginError.classList.remove('hidden');
                 handleLogout();
+            }
+        }
+
+        // --- (¡NUEVO!) Handler de Registro ---
+        async function handleRegister(e) {
+            e.preventDefault();
+            registerStatus.classList.add('hidden');
+            
+            // 1. Recolectar datos del formulario
+            const body = {
+                username: document.getElementById('username-reg').value,
+                password: document.getElementById('password-reg').value,
+                pii: {
+                    nombre: document.getElementById('nombre-reg').value,
+                    dni: document.getElementById('dni-reg').value,
+                    email: document.getElementById('email-reg').value,
+                    fecha_nac: document.getElementById('fecha-nac-reg').value // Formato YYYY-MM-DD (string)
+                },
+                obra_social: document.getElementById('os-reg').value || null
+            };
+
+            // 2. Llamar al nuevo endpoint de registro
+            try {
+                const res = await fetch(`${API_URL}/register/paciente`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (!res.ok) { 
+                    const err = await res.json(); 
+                    throw new Error(err.detail || 'Error al registrar'); 
+                }
+
+                // ¡Éxito!
+                registerStatus.textContent = "¡Registro exitoso! Ahora puedes ingresar.";
+                registerStatus.className = 'text-sm mb-4 text-green-600';
+                registerStatus.classList.remove('hidden');
+                registerForm.reset();
+                // Cambiar a la pestaña de login
+                switchLoginTabs('login');
+
+            } catch (error) {
+                console.error("Error en el registro:", error);
+                registerStatus.textContent = error.message;
+                registerStatus.className = 'text-sm mb-4 text-red-600';
+                registerStatus.classList.remove('hidden');
             }
         }
         
@@ -141,7 +227,8 @@
         // --- Carga de Datos (Dinámica por Tab) ---
         async function fetchDataForTab(tabName) {
             if (!currentUser) return;
-            const pacienteId = currentUser._id;
+            // ¡CORREGIDO! El ID del paciente ahora viene del objeto 'currentUser' que ya no tiene _id
+            const pacienteId = currentUser._id; // <-- Esto está bien, currentUser es el JSON crudo
             
             const contentDiv = document.getElementById(`${tabName}-content`);
             contentDiv.innerHTML = ''; // Limpiar
@@ -155,7 +242,6 @@
                     return res.json();
                 };
                 
-                // Cargar datos según la pestaña
                 if (tabName === 'perfil') {
                     const perfil = await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`);
                     renderPerfil(perfil);
@@ -277,7 +363,7 @@
             document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
         }
 
-        // --- (¡NUEVO!) Handler Registrar Hábito (Req 2) ---
+        // --- Handler Registrar Hábito (Req 2) ---
         async function handleRegistrarHabito(e) {
             e.preventDefault();
             const statusDiv = document.getElementById('habito-status');
@@ -285,7 +371,6 @@
             const valor = document.getElementById('habito-valor').value;
             const notas = document.getElementById('habito-notas').value;
 
-            // Convertir valor a número si no es un síntoma
             let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
             if (isNaN(valorParseado) && tipo !== 'sintoma') {
                  statusDiv.textContent = 'El valor debe ser numérico.';
@@ -308,14 +393,14 @@
                 
                 statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
                 statusDiv.className = 'text-sm mt-2 text-green-600';
-                e.target.reset(); // Limpiar formulario
+                e.target.reset(); 
             } catch (error) {
                 statusDiv.textContent = `Error: ${error.message}`;
                 statusDiv.className = 'text-sm mt-2 text-red-600';
             }
         }
 
-        // --- (¡NUEVO!) Handler Sacar Turno (Req 4) ---
+        // --- Handler Sacar Turno (Req 4) ---
         async function handleSacarTurno(e) {
             e.preventDefault();
             const statusDiv = document.getElementById('turno-status');
@@ -328,13 +413,19 @@
                 statusDiv.className = 'text-sm mt-2 text-red-600';
                 return;
             }
+            
+            // (¡NUEVA VALIDACIÓN!) No permitir turnos en el pasado
+            if (new Date(ts) < new Date()) {
+                statusDiv.textContent = 'La fecha y hora del turno no pueden ser anteriores a la actual.';
+                statusDiv.className = 'text-sm mt-2 text-red-600';
+                return;
+            }
 
             statusDiv.textContent = 'Solicitando...';
             try {
-                // Generar un ID de turno único (simple)
                 const turno_id = "turno-" + Date.now();
-                const medico_data = document.getElementById('turno-medico').options[0].text; // "Dra. Ana Gomez (Cardiología)"
-                const especialidad = medico_data.split('(')[1].replace(')',''); // "Cardiología"
+                const medico_data = document.getElementById('turno-medico').options[0].text; 
+                const especialidad = medico_data.split('(')[1].replace(')',''); 
 
                 const res = await fetch(`${API_URL}/turnos`, {
                     method: 'POST',
@@ -361,22 +452,41 @@
 
         // --- Event Listeners ---
         loginForm.addEventListener('submit', handleLogin);
+        registerForm.addEventListener('submit', handleRegister); // <-- ¡NUEVO!
         logoutButton.addEventListener('click', handleLogout);
 
+        // (¡NUEVO!) Listeners para las pestañas de Login/Registro
+        function switchLoginTabs(targetTab) {
+            if (targetTab === 'login') {
+                loginPane.classList.remove('hidden');
+                registerPane.classList.add('hidden');
+                tabBtnLogin.classList.add('active');
+                tabBtnRegister.classList.remove('active', 'text-gray-500');
+                tabBtnRegister.classList.add('text-gray-500');
+            } else {
+                loginPane.classList.add('hidden');
+                registerPane.classList.remove('hidden');
+                tabBtnLogin.classList.remove('active');
+                tabBtnLogin.classList.add('text-gray-500');
+                tabBtnRegister.classList.add('active');
+                tabBtnRegister.classList.remove('text-gray-500');
+            }
+        }
+        tabBtnLogin.addEventListener('click', () => switchLoginTabs('login'));
+        tabBtnRegister.addEventListener('click', () => switchLoginTabs('register'));
+
+
+        // Listeners para las pestañas del Dashboard
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = button.dataset.tab;
-                
                 tabPanes.forEach(pane => pane.classList.add('hidden'));
                 tabButtons.forEach(btn => {
                     btn.classList.remove('border-blue-700', 'text-blue-800');
                     btn.classList.add('text-gray-500');
                 });
-                
                 document.getElementById(`${targetTab}-content`).classList.remove('hidden');
                 button.classList.add('border-blue-700', 'text-blue-800');
-                
-                // Cargar datos solo cuando se hace clic en la pestaña
                 fetchDataForTab(targetTab);
             });
         });
