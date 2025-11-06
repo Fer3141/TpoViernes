@@ -10,7 +10,6 @@
         #dashboard-screen { display: none; }
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Estilos para las pestañas de login/registro */
         .login-tab.active { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; }
         .login-tab { border-bottom: 2px solid transparent; }
     </style>
@@ -19,12 +18,10 @@
 
     <div id="login-screen" class="flex items-center justify-center h-full">
         <div class="p-8 bg-white rounded-lg shadow-xl w-96">
-            
             <div class="flex border-b mb-6">
                 <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Ingresar</button>
                 <button id="tab-btn-register" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Registrarse</button>
             </div>
-
             <div id="login-pane">
                 <form id="login-form">
                     <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">VidaSana (Paciente)</h2>
@@ -40,7 +37,6 @@
                     <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
                 </form>
             </div>
-
             <div id="register-pane" class="hidden">
                 <form id="register-form">
                     <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Crear Cuenta Paciente</h2>
@@ -74,19 +70,24 @@
         </header>
         <main class="flex-1 flex flex-col p-6 overflow-hidden">
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
+                
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
                     <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-700 text-blue-800"><i data-lucide="user" class="w-4 h-4"></i><span>Mi Perfil</span></button>
                     <button data-tab="registrar" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="edit" class="w-4 h-4"></i><span>Registrar Hábito</span></button>
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Mis Hábitos</span></button>
                     <button data-tab="turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
+                    <button data-tab="mis-turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clock" class="w-4 h-4"></i><span>Mis Turnos</span></button>
                 </nav>
+
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
+
                 <div id="tab-content">
                     <div id="perfil-content" class="tab-pane"></div>
                     <div id="registrar-content" class="tab-pane hidden"></div>
                     <div id="habitos-content" class="tab-pane hidden"></div>
                     <div id="turnos-content" class="tab-pane hidden"></div>
+                    <div id="mis-turnos-content" class="tab-pane hidden"></div>
                 </div>
             </div>
         </main>
@@ -108,8 +109,6 @@
         const tabPanes = document.querySelectorAll('.tab-pane');
         const loadingSpinner = document.getElementById('loading-spinner');
         const contentError = document.getElementById('content-error');
-
-        // (¡NUEVO!) Selectores de Login/Registro
         const tabBtnLogin = document.getElementById('tab-btn-login');
         const tabBtnRegister = document.getElementById('tab-btn-register');
         const loginPane = document.getElementById('login-pane');
@@ -117,7 +116,17 @@
         const registerForm = document.getElementById('register-form');
         const registerStatus = document.getElementById('register-status');
 
-        // --- Login (Actualizado) ---
+        // --- (¡NUEVO!) Helper de API ---
+        const fetchApi = async (url) => {
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+            if (!res.ok) { 
+                const err = await res.json(); 
+                throw new Error(err.detail || 'Error de API'); 
+            }
+            return res.json();
+        };
+
+        // --- Login ---
         async function handleLogin(e) {
             e.preventDefault();
             loginError.classList.add('hidden');
@@ -126,7 +135,6 @@
             formData.append('password', document.getElementById('password').value);
 
             try {
-                // 1. Pedir el token
                 const res = await fetch(`${API_URL}/token`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -138,15 +146,8 @@
                 currentToken = tokenData.access_token;
                 localStorage.setItem('vidasana_token', currentToken);
                 
-                // 2. Usar el token para pedir info del usuario
-                const userRes = await fetch(`${API_URL}/usuarios/me`, {
-                    headers: { 'Authorization': `Bearer ${currentToken}` }
-                });
-                if (!userRes.ok) throw new Error('No se pudo obtener el perfil del usuario');
-                
-                currentUser = await userRes.json();
+                currentUser = await fetchApi(`${API_URL}/usuarios/me`);
 
-                // 3. Validar que sea Paciente
                 if (!currentUser.roles.includes("PACIENTE")) {
                     throw new Error("Acceso denegado. Este portal es solo para PACIENTES.");
                 }
@@ -161,12 +162,11 @@
             }
         }
 
-        // --- (¡NUEVO!) Handler de Registro ---
+        // --- Registro ---
         async function handleRegister(e) {
             e.preventDefault();
             registerStatus.classList.add('hidden');
             
-            // 1. Recolectar datos del formulario
             const body = {
                 username: document.getElementById('username-reg').value,
                 password: document.getElementById('password-reg').value,
@@ -174,30 +174,23 @@
                     nombre: document.getElementById('nombre-reg').value,
                     dni: document.getElementById('dni-reg').value,
                     email: document.getElementById('email-reg').value,
-                    fecha_nac: document.getElementById('fecha-nac-reg').value // Formato YYYY-MM-DD (string)
+                    fecha_nac: document.getElementById('fecha-nac-reg').value
                 },
                 obra_social: document.getElementById('os-reg').value || null
             };
 
-            // 2. Llamar al nuevo endpoint de registro
             try {
                 const res = await fetch(`${API_URL}/register/paciente`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                
-                if (!res.ok) { 
-                    const err = await res.json(); 
-                    throw new Error(err.detail || 'Error al registrar'); 
-                }
+                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
 
-                // ¡Éxito!
                 registerStatus.textContent = "¡Registro exitoso! Ahora puedes ingresar.";
                 registerStatus.className = 'text-sm mb-4 text-green-600';
                 registerStatus.classList.remove('hidden');
                 registerForm.reset();
-                // Cambiar a la pestaña de login
                 switchLoginTabs('login');
 
             } catch (error) {
@@ -212,8 +205,6 @@
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
             dashboardScreen.style.display = 'flex';
-            
-            // Cargar datos del paciente logueado
             await fetchDataForTab('perfil');
         }
 
@@ -224,24 +215,17 @@
             dashboardScreen.style.display = 'none';
         }
 
-        // --- Carga de Datos (Dinámica por Tab) ---
+        // --- Carga de Datos (¡ACTUALIZADO!) ---
         async function fetchDataForTab(tabName) {
             if (!currentUser) return;
-            // ¡CORREGIDO! El ID del paciente ahora viene del objeto 'currentUser' que ya no tiene _id
-            const pacienteId = currentUser._id; // <-- Esto está bien, currentUser es el JSON crudo
+            const pacienteId = currentUser._id; // _id viene del JSON crudo de /usuarios/me
             
             const contentDiv = document.getElementById(`${tabName}-content`);
-            contentDiv.innerHTML = ''; // Limpiar
+            contentDiv.innerHTML = ''; 
             loadingSpinner.classList.remove('hidden');
             contentError.classList.add('hidden');
             
             try {
-                const fetchApi = async (url) => {
-                    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
-                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                    return res.json();
-                };
-                
                 if (tabName === 'perfil') {
                     const perfil = await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`);
                     renderPerfil(perfil);
@@ -252,6 +236,9 @@
                     renderHabitos(habitos);
                 } else if (tabName === 'turnos') {
                     renderFormTurno();
+                } else if (tabName === 'mis-turnos') { // <-- ¡NUEVO!
+                    const turnos = await fetchApi(`${API_URL}/paciente/${pacienteId}/turnos`);
+                    renderMisTurnos(turnos);
                 }
 
             } catch (err) {
@@ -264,7 +251,8 @@
             }
         }
         
-        // --- Render Perfil (Req 1) ---
+        // --- Funciones de Renderizado ---
+        
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
@@ -279,7 +267,6 @@
             `;
         }
 
-        // --- Render Formulario de Hábitos (Req 2) ---
         function renderFormHabito() {
             document.getElementById('registrar-content').innerHTML = `
                 <h3 class="text-xl font-semibold text-gray-800">Registrar Hábito o Síntoma</h3>
@@ -308,7 +295,6 @@
             document.getElementById('form-habito').addEventListener('submit', handleRegistrarHabito);
         }
 
-        // --- Render Mis Hábitos (Req 2) ---
         function renderHabitos(habitos) {
              let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Hábitos Registrados</h3>';
             if (habitos.length === 0) {
@@ -333,7 +319,6 @@
             document.getElementById('habitos-content').innerHTML = html;
         }
 
-        // --- Render Formulario de Turno (Req 4) ---
         function renderFormTurno() {
             document.getElementById('turnos-content').innerHTML = `
                 <h3 class="text-xl font-semibold text-gray-800">Solicitar Turno</h3>
@@ -363,7 +348,37 @@
             document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
         }
 
-        // --- Handler Registrar Hábito (Req 2) ---
+        // --- (¡NUEVO!) Render Mis Turnos (Req 4) ---
+        function renderMisTurnos(turnos) {
+            let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Turnos</h3>';
+            if (turnos.length === 0) {
+                html += '<p class="mt-4">No tienes turnos registrados.</p>';
+            } else {
+                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        </tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${turnos.map(t => {
+                                const estadoClase = t.estado === 'pendiente' ? 'text-blue-600' : 'text-gray-500';
+                                return `
+                                <tr>
+                                    <td class="px-6 py-4">${new Date(t.ts.$date).toLocaleString()}</td>
+                                    <td class="px-6 py-4">${t.medico_nombre || 'N/A'}</td>
+                                    <td class="px-6 py-4">${t.especialidad}</td>
+                                    <td class="px-6 py-4 font-semibold ${estadoClase}">${t.estado}</td>
+                                </tr>
+                            `}).join('')}
+                        </tbody></table>`;
+            }
+            document.getElementById('mis-turnos-content').innerHTML = html;
+        }
+
+
+        // --- Handlers (Sin cambios) ---
         async function handleRegistrarHabito(e) {
             e.preventDefault();
             const statusDiv = document.getElementById('habito-status');
@@ -383,14 +398,9 @@
                 const res = await fetch(`${API_URL}/habitos`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        "tipo": tipo,
-                        "valor": valorParseado,
-                        "notas": notas || null
-                    })
+                    body: JSON.stringify({ "tipo": tipo, "valor": valorParseado, "notas": notas || null })
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
                 statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
                 statusDiv.className = 'text-sm mt-2 text-green-600';
                 e.target.reset(); 
@@ -400,7 +410,6 @@
             }
         }
 
-        // --- Handler Sacar Turno (Req 4) ---
         async function handleSacarTurno(e) {
             e.preventDefault();
             const statusDiv = document.getElementById('turno-status');
@@ -413,8 +422,6 @@
                 statusDiv.className = 'text-sm mt-2 text-red-600';
                 return;
             }
-            
-            // (¡NUEVA VALIDACIÓN!) No permitir turnos en el pasado
             if (new Date(ts) < new Date()) {
                 statusDiv.textContent = 'La fecha y hora del turno no pueden ser anteriores a la actual.';
                 statusDiv.className = 'text-sm mt-2 text-red-600';
@@ -432,7 +439,7 @@
                     headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         "_id": turno_id,
-                        "paciente_id": currentUser._id, // ¡El ID del paciente logueado!
+                        "paciente_id": currentUser._id, 
                         "medico_id": medico_id,
                         "ts": new Date(ts).toISOString(),
                         "especialidad": especialidad,
@@ -452,10 +459,9 @@
 
         // --- Event Listeners ---
         loginForm.addEventListener('submit', handleLogin);
-        registerForm.addEventListener('submit', handleRegister); // <-- ¡NUEVO!
+        registerForm.addEventListener('submit', handleRegister);
         logoutButton.addEventListener('click', handleLogout);
 
-        // (¡NUEVO!) Listeners para las pestañas de Login/Registro
         function switchLoginTabs(targetTab) {
             if (targetTab === 'login') {
                 loginPane.classList.remove('hidden');
@@ -475,8 +481,6 @@
         tabBtnLogin.addEventListener('click', () => switchLoginTabs('login'));
         tabBtnRegister.addEventListener('click', () => switchLoginTabs('register'));
 
-
-        // Listeners para las pestañas del Dashboard
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = button.dataset.tab;

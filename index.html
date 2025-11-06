@@ -84,7 +84,17 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const contentError = document.getElementById('content-error');
 
-        // --- Login (Actualizado) ---
+        // --- (¡NUEVO!) Helper de API (movido a scope global) ---
+        const fetchApi = async (url) => {
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
+            if (!res.ok) { 
+                const err = await res.json(); 
+                throw new Error(err.detail || 'Error de API'); 
+            }
+            return res.json();
+        };
+
+        // --- Login (¡ACTUALIZADO!) ---
         async function handleLogin(e) {
             e.preventDefault();
             loginError.classList.add('hidden');
@@ -105,20 +115,20 @@
                 currentToken = tokenData.access_token;
                 localStorage.setItem('vidasana_token', currentToken);
                 
-                // 2. Usar el token para pedir info del usuario (¡NUEVO!)
-                const userRes = await fetch(`${API_URL}/usuarios/me`, {
-                    headers: { 'Authorization': `Bearer ${currentToken}` }
-                });
-                if (!userRes.ok) throw new Error('No se pudo obtener el perfil del usuario');
-                
-                currentUser = await userRes.json();
+                // 2. Usar el token para pedir info del médico
+                currentUser = await fetchApi(`${API_URL}/usuarios/me`);
 
                 // 3. Validar que sea Médico
                 if (!currentUser.roles.includes("MEDICO")) {
                     throw new Error("Acceso denegado. Se requiere rol de MÉDICO.");
                 }
 
-                await showDashboard();
+                // 4. (¡NUEVO!) Cargar la lista de pacientes del médico
+                // (Usamos currentUser._id porque es el JSON crudo de la API)
+                const pacientes = await fetchApi(`${API_URL}/medico/${currentUser._id}/pacientes`);
+                
+                // 5. Mostrar Dashboard (pasando la lista de pacientes)
+                await showDashboard(pacientes);
 
             } catch (error) {
                 console.error("Error en el login:", error);
@@ -128,19 +138,23 @@
             }
         }
         
-        async function showDashboard() {
+        // --- (¡ACTUALIZADO!) ---
+        async function showDashboard(pacientes) {
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
             dashboardScreen.style.display = 'flex';
             
-            // Cargar pacientes (hardcodeado para demo, idealmente vendría de la API)
-            const pacientes = [
-                { id: 'usr-001', nombre: 'Juan Lopez' },
-                { id: 'usr-002', nombre: 'Maria Lopez' },
-            ];
-            pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-            
-            await fetchDataForPatient(pacientes[0].id);
+            // (¡ACTUALIZADO!) Carga dinámica de pacientes
+            if (pacientes && pacientes.length > 0) {
+                pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+                // Cargar datos del primer paciente
+                await fetchDataForPatient(pacientes[0].id);
+            } else {
+                pacienteSelect.innerHTML = `<option value="">No tiene pacientes con turnos pendientes</option>`;
+                // Limpiar el dashboard
+                tabPanes.forEach(pane => pane.innerHTML = '<p>No hay pacientes seleccionados.</p>');
+                loadingSpinner.classList.add('hidden');
+            }
         }
 
         function handleLogout() {
@@ -158,18 +172,12 @@
             tabPanes.forEach(pane => pane.innerHTML = ''); 
 
             try {
-                const fetchApi = async (url) => {
-                    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
-                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                    return res.json();
-                };
-                
                 const [perfil, visitas, habitos, red, riesgos] = await Promise.all([
                     fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`),
                     fetchApi(`${API_URL}/paciente/${pacienteId}/visitas`),
                     fetchApi(`${API_URL}/paciente/${pacienteId}/habitos`),
                     fetchApi(`${API_URL}/paciente/${pacienteId}/red_cuidado`),
-                    fetchApi(`${API_URL}/paciente/${pacienteId}/familiares_con_riesgo?riesgo=diabetes`) // Mantenemos diabetes como default
+                    fetchApi(`${API_URL}/paciente/${pacienteId}/familiares_con_riesgo?riesgo=diabetes`)
                 ]);
 
                 renderPerfil(perfil);
@@ -187,7 +195,8 @@
             }
         }
         
-        // --- Render Perfil (Req 1) ---
+        // --- Funciones de Renderizado (Sin cambios) ---
+        
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
@@ -210,7 +219,6 @@
             document.getElementById('btn-guardar-os').addEventListener('click', () => handleGuardarOS(perfil._id));
         }
         
-        // --- Render Visitas (Req 1) ---
         function renderVisitas(visitas) {
             let html = '<h3 class="text-xl font-semibold text-gray-800">Historia Clínica</h3>';
             if (visitas.length === 0) {
@@ -235,7 +243,6 @@
             document.getElementById('visitas-content').innerHTML = html;
         }
 
-        // --- Render Hábitos (Req 2) ---
         function renderHabitos(habitos) {
              let html = '<h3 class="text-xl font-semibold text-gray-800">Seguimiento de Hábitos</h3>';
             if (habitos.length === 0) {
@@ -260,7 +267,6 @@
             document.getElementById('habitos-content').innerHTML = html;
         }
 
-        // --- Render Red y Riesgos (Req 3 y 5) (¡ACTUALIZADO!) ---
         function renderRed(red, riesgos) {
             const redHtml = (red?.medicos_tratantes.length > 0)
                 ? `<ul class="list-disc list-inside">${red.medicos_tratantes.map(m => `<li>${m.nombre_medico} (${m.rol})</li>`).join('')}</ul>`
@@ -288,7 +294,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="space-y-6">
                          <div>
                             <h3 class="text-xl font-semibold">Cálculo de Riesgo (Mongo)</h3>
@@ -321,7 +326,7 @@
             document.getElementById('btn-asignar-riesgo').addEventListener('click', () => handleAsignarRiesgo(red.pacienteId));
         }
         
-        // --- Handlers (Actualizados) ---
+        // --- Handlers (Sin cambios) ---
         async function handleGuardarOS(pacienteId) {
             const statusDiv = document.getElementById('os-save-status');
             const input = document.getElementById('input-obra-social');
@@ -376,7 +381,6 @@
             }
         }
 
-        // --- (¡NUEVO!) Handler para Asignar Riesgo (Req 5) ---
         async function handleAsignarRiesgo(pacienteId) {
             const statusDiv = document.getElementById('asignar-riesgo-status');
             const input = document.getElementById('input-asignar-riesgo');
@@ -431,12 +435,6 @@
 
         // --- Init ---
         function initApp() {
-            const storedToken = localStorage.getItem('vidasana_token');
-            if (storedToken) {
-                // (No auto-login, es mejor que el médico ponga sus credenciales siempre)
-                // currentToken = storedToken;
-                // showDashboard(); 
-            }
             lucide.createIcons();
         }
         initApp();

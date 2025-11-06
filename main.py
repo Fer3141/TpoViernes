@@ -564,6 +564,131 @@ async def actualizar_estado_turno(
     await redis_client.publish(canal, mensaje)
     return {"status": f"turno actualizado a {update.estado}", "turno_id": turno_id}
 
+# --- (¡NUEVO!) Endpoint para el Dashboard del Médico ---
+@app.get("/medico/{medico_id}/pacientes")
+async def get_pacientes_del_medico(
+    medico_id: str, 
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
+    """
+    (Req 6) Obtiene la lista de pacientes únicos que tienen un turno 
+    pendiente con este médico. 
+    Usa un pipeline de agregación para buscar en 'turnos' y luego 
+    hacer un $lookup con 'usuarios' para obtener los nombres.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+
+    if "MEDICO" not in current_user.roles or current_user.id != medico_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+
+    pipeline = [
+        {
+            # 1. Encontrar turnos pendientes para este médico
+            "$match": {
+                "medico_id": medico_id,
+                "estado": "pendiente"
+            }
+        },
+        {
+            # 2. Agrupar por paciente_id para obtener pacientes únicos
+            "$group": {
+                "_id": "$paciente_id"
+            }
+        },
+        {
+            # 3. Unir con la colección 'usuarios' para obtener datos del paciente
+            "$lookup": {
+                "from": "usuarios",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "paciente_info"
+            }
+        },
+        {
+            # 4. Descomprimir el array (siempre será 1)
+            "$unwind": "$paciente_info"
+        },
+        {
+            # 5. Formatear la salida
+            "$project": {
+                "_id": 0,
+                "id": "$paciente_info._id",
+                "nombre": "$paciente_info.pii.nombre"
+            }
+        },
+        {
+            # 6. Ordenar por nombre
+            "$sort": {"nombre": 1}
+        }
+    ]
+
+    try:
+        cursor = mongo_db.turnos.aggregate(pipeline)
+        pacientes = await cursor.to_list(length=None)
+        return pacientes
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
+
+# --- (¡NUEVO!) Endpoint para el Dashboard del Paciente ---
+@app.get("/paciente/{paciente_id}/turnos")
+async def get_turnos_del_paciente(
+    paciente_id: str, 
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
+    """
+    (Req 4) Obtiene la lista de turnos (pendientes y pasados) 
+    de un paciente específico.
+    Usa $lookup para adjuntar el nombre del médico.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+    
+    pipeline = [
+        {
+            # 1. Encontrar turnos del paciente
+            "$match": {"paciente_id": paciente_id}
+        },
+        {
+            # 2. Ordenar por fecha (más próximos primero)
+            "$sort": {"ts": 1}
+        },
+        {
+            # 3. Unir con 'usuarios' para obtener el nombre del médico
+            "$lookup": {
+                "from": "usuarios",
+                "localField": "medico_id",
+                "foreignField": "_id",
+                "as": "medico_info"
+            }
+        },
+        {
+            # 4. Descomprimir (o preservar si el médico fue borrado)
+            "$unwind": {
+                "path": "$medico_info",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            # 5. Formatear la salida
+            "$project": {
+                "_id": 1,
+                "ts": 1,
+                "estado": 1,
+                "especialidad": 1,
+                "sede": 1,
+                "medico_nombre": { "$ifNull": [ "$medico_info.pii.nombre", "N/A" ] }
+            }
+        }
+    ]
+    
+    try:
+        cursor = mongo_db.turnos.aggregate(pipeline)
+        turnos = await cursor.to_list(length=100)
+        return parse_json(turnos) # Usamos parse_json por las fechas (ts)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
 # ---
 # REQ 5: Evaluación de Riesgos
 # ---
