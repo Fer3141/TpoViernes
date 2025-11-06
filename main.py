@@ -16,6 +16,7 @@ from pydantic import BaseModel
 # --- Nuevas importaciones de Seguridad ---
 from jose import JWTError, jwt
 from passlib.context import CryptContext # <-- CORRECCIÓN (antes PasslibContext)
+from routers.usuario_router import router as usuario_router
 
 # --- Cargar Variables de Entorno ---
 load_dotenv()
@@ -66,6 +67,9 @@ app.add_middleware(
     allow_headers=["*"], # Permite todos los headers
 )
 # --- FIN DE CONFIGURACIÓN DE CORS ---
+
+# --- Registrar Routers ---
+app.include_router(usuario_router)
 
 
 # --- Modelos Pydantic ---

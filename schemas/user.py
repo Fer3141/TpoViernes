@@ -55,7 +55,7 @@ class AuthModel(BaseModel):
 
 class UsuarioInput(BaseModel):
     # ... (contenido de UsuarioInput)
-    id: str 
+    id: Optional[str] = None 
     auth: AuthModel
     roles: List[str] 
     pii: PIIModel 
