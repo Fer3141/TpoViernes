@@ -267,7 +267,6 @@ async def register_paciente(user_in: PacienteRegister):
         "roles": ["PACIENTE"], 
         "pii": user_in.pii.dict(exclude_none=True), 
         "paciente": {"obra_social": user_in.obra_social, "numero_afiliado": user_in.numero_afiliado, "clinico": {}},
-        "medico": None
     }
     
     try:
@@ -311,7 +310,6 @@ async def admin_crear_medico(
         "roles": ["MEDICO"], 
         "pii": user_in.pii.dict(exclude_none=True),
         "paciente": None,
-        "medico": user_in.perfil.dict(exclude_none=True)
     }
     
     try:
