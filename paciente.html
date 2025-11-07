@@ -6,6 +6,7 @@
     <title>Portal Paciente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         #dashboard-screen { display: none; }
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
@@ -62,7 +63,7 @@
 
     <div id="dashboard-screen" class="h-screen flex-col bg-gray-100">
         <header class="flex items-center justify-between p-4 bg-white border-b shadow-sm">
-            <h1 class="text-2xl font-bold text-blue-800">Mi Portal de Paciente</h1>
+            <h1 class="text-2xl font-bold text-blue-800">VidaSana</h1>
             <div class="flex items-center space-x-4">
                 <span class="text-gray-700 hidden sm:block">¡Hola, <span id="user-name" class="font-semibold"></span>!</span>
                 <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
@@ -116,7 +117,7 @@
         const registerForm = document.getElementById('register-form');
         const registerStatus = document.getElementById('register-status');
 
-        // --- (¡NUEVO!) Helper de API ---
+        // --- Helper de API ---
         const fetchApi = async (url) => {
             const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
             if (!res.ok) { 
@@ -156,7 +157,15 @@
 
             } catch (error) {
                 console.error("Error en el login:", error);
-                loginError.textContent = error.message;
+                // Usar SweetAlert2 para mostrar el error de login
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de inicio de sesión',
+                    text: error.message,
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626' // Red 600
+                });
+                loginError.textContent = error.message; // Mantener para fallback o debugging si se desea
                 loginError.classList.remove('hidden');
                 handleLogout();
             }
@@ -187,14 +196,25 @@
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
 
-                registerStatus.textContent = "¡Registro exitoso! Ahora puedes ingresar.";
-                registerStatus.className = 'text-sm mb-4 text-green-600';
-                registerStatus.classList.remove('hidden');
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Registro exitoso!',
+                    text: 'Tu cuenta ha sido creada. Ahora puedes iniciar sesión.',
+                    confirmButtonText: 'Ok',
+                    confirmButtonColor: '#22c55e' // Green 500
+                });
                 registerForm.reset();
                 switchLoginTabs('login');
 
             } catch (error) {
                 console.error("Error en el registro:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de registro',
+                    text: error.message,
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626' // Red 600
+                });
                 registerStatus.textContent = error.message;
                 registerStatus.className = 'text-sm mb-4 text-red-600';
                 registerStatus.classList.remove('hidden');
@@ -215,10 +235,10 @@
             dashboardScreen.style.display = 'none';
         }
 
-        // --- Carga de Datos (¡ACTUALIZADO!) ---
+        // --- Carga de Datos ---
         async function fetchDataForTab(tabName) {
             if (!currentUser) return;
-            const pacienteId = currentUser._id; // _id viene del JSON crudo de /usuarios/me
+            const pacienteId = currentUser._id;
             
             const contentDiv = document.getElementById(`${tabName}-content`);
             contentDiv.innerHTML = ''; 
@@ -236,7 +256,7 @@
                     renderHabitos(habitos);
                 } else if (tabName === 'turnos') {
                     renderFormTurno();
-                } else if (tabName === 'mis-turnos') { // <-- ¡NUEVO!
+                } else if (tabName === 'mis-turnos') { 
                     const turnos = await fetchApi(`${API_URL}/paciente/${pacienteId}/turnos`);
                     renderMisTurnos(turnos);
                 }
@@ -348,7 +368,6 @@
             document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
         }
 
-        // --- (¡NUEVO!) Render Mis Turnos (Req 4) ---
         function renderMisTurnos(turnos) {
             let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Turnos</h3>';
             if (turnos.length === 0) {
@@ -378,9 +397,27 @@
         }
 
 
-        // --- Handlers (Sin cambios) ---
+        // --- Handlers (¡ACTUALIZADOS CON SweetAlert2!) ---
         async function handleRegistrarHabito(e) {
             e.preventDefault();
+            
+            // --- ¡NUEVO! Confirmación con SweetAlert2 ---
+            const result = await Swal.fire({
+                title: '¿Estás seguro?',
+                text: "¿Deseas registrar este hábito?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#1d4ed8', // Blue 700
+                cancelButtonColor: '#ef4444',   // Red 500
+                confirmButtonText: 'Sí, registrar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (!result.isConfirmed) {
+                return; // Detener si el usuario cancela
+            }
+            // --- Fin ---
+
             const statusDiv = document.getElementById('habito-status');
             const tipo = document.getElementById('habito-tipo').value;
             const valor = document.getElementById('habito-valor').value;
@@ -388,9 +425,14 @@
 
             let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
             if (isNaN(valorParseado) && tipo !== 'sintoma') {
-                 statusDiv.textContent = 'El valor debe ser numérico.';
-                 statusDiv.className = 'text-sm mt-2 text-red-600';
-                 return;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de entrada',
+                    text: 'El valor debe ser numérico para este tipo de hábito.',
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626'
+                });
+                return;
             }
 
             statusDiv.textContent = 'Registrando...';
@@ -401,30 +443,71 @@
                     body: JSON.stringify({ "tipo": tipo, "valor": valorParseado, "notas": notas || null })
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
-                statusDiv.className = 'text-sm mt-2 text-green-600';
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Registrado!',
+                    text: `El hábito '${tipo}' ha sido registrado con éxito.`,
+                    confirmButtonText: 'Ok',
+                    confirmButtonColor: '#22c55e'
+                });
                 e.target.reset(); 
             } catch (error) {
-                statusDiv.textContent = `Error: ${error.message}`;
-                statusDiv.className = 'text-sm mt-2 text-red-600';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al registrar',
+                    text: `Error: ${error.message}`,
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626'
+                });
+            } finally {
+                statusDiv.textContent = ''; // Limpiar el estado interno
             }
         }
 
         async function handleSacarTurno(e) {
             e.preventDefault();
+
+            // --- ¡NUEVO! Confirmación con SweetAlert2 ---
+            const result = await Swal.fire({
+                title: '¿Confirmar turno?',
+                text: "¿Estás seguro de que deseas solicitar este turno?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#1d4ed8', // Blue 700
+                cancelButtonColor: '#ef4444',   // Red 500
+                confirmButtonText: 'Sí, solicitar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (!result.isConfirmed) {
+                return; // Detener si el usuario cancela
+            }
+            // --- Fin ---
+
             const statusDiv = document.getElementById('turno-status');
             const medico_id = document.getElementById('turno-medico').value;
             const ts = document.getElementById('turno-ts').value;
             const sede = document.getElementById('turno-sede').value;
 
             if (!ts) {
-                statusDiv.textContent = 'Debe seleccionar una fecha y hora.';
-                statusDiv.className = 'text-sm mt-2 text-red-600';
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo requerido',
+                    text: 'Debe seleccionar una fecha y hora para el turno.',
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#fbbf24' // Yellow 400
+                });
                 return;
             }
             if (new Date(ts) < new Date()) {
-                statusDiv.textContent = 'La fecha y hora del turno no pueden ser anteriores a la actual.';
-                statusDiv.className = 'text-sm mt-2 text-red-600';
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Fecha inválida',
+                    text: 'La fecha y hora del turno no pueden ser anteriores a la actual.',
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#fbbf24'
+                });
                 return;
             }
 
@@ -448,19 +531,48 @@
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
                 
-                statusDiv.textContent = `¡Turno solicitado con éxito para ${especialidad}!`;
-                statusDiv.className = 'text-sm mt-2 text-green-600';
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Turno solicitado!',
+                    text: `Tu turno para ${especialidad} ha sido solicitado con éxito.`,
+                    confirmButtonText: 'Ok',
+                    confirmButtonColor: '#22c55e'
+                });
                 e.target.reset();
             } catch (error) {
-                statusDiv.textContent = `Error: ${error.message}`;
-                statusDiv.className = 'text-sm mt-2 text-red-600';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al solicitar turno',
+                    text: `Error: ${error.message}`,
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626'
+                });
+            } finally {
+                statusDiv.textContent = ''; // Limpiar el estado interno
             }
         }
 
-        // --- Event Listeners ---
+        // --- Event Listeners (¡ACTUALIZADO!) ---
         loginForm.addEventListener('submit', handleLogin);
         registerForm.addEventListener('submit', handleRegister);
-        logoutButton.addEventListener('click', handleLogout);
+        
+        // --- ¡NUEVO! Confirmación de Logout con SweetAlert2 ---
+        logoutButton.addEventListener('click', async () => {
+            const result = await Swal.fire({
+                title: '¿Cerrar sesión?',
+                text: "¿Estás seguro de que deseas cerrar tu sesión actual?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626', // Red 600
+                cancelButtonColor: '#6b7280',   // Gray 500
+                confirmButtonText: 'Sí, cerrar sesión',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                handleLogout();
+            }
+        });
 
         function switchLoginTabs(targetTab) {
             if (targetTab === 'login') {

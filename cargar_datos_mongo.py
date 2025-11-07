@@ -1,11 +1,11 @@
 import os
 import pymongo
+from pymongo import ReplaceOne # <-- ¡Importante!
 from datetime import datetime
 from dotenv import load_dotenv
-from passlib.context import CryptContext # <-- Importa la clase correcta
+from passlib.context import CryptContext 
 
 # --- Configuración de Hash ---
-# Usa CryptContext (la clase)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") 
 
 def get_password_hash(password):
@@ -17,11 +17,10 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME")
 
-# --- Datos de ejemplo (Modelo Escalable) ---
+# --- Datos de ejemplo (¡Admin añadido!) ---
 USUARIOS = [
     {
       "_id": "usr-001", 
-      # Guarda la contraseña "pass123" hasheada
       "auth": {"username": "ljuan", "password_hash": get_password_hash("pass123")}, 
       "roles": ["PACIENTE"],
       "pii": {"dni": "12345678", "nombre": "Juan Lopez"},
@@ -33,7 +32,6 @@ USUARIOS = [
     },
     {
       "_id": "usr-002", 
-      # Guarda la contraseña "pass123" hasheada
       "auth": {"username": "mlopez", "password_hash": get_password_hash("pass123")}, 
       "roles": ["PACIENTE"],
       "pii": {"dni": "23456789", "nombre": "Maria Lopez"},
@@ -45,11 +43,18 @@ USUARIOS = [
     },
     {
       "_id": "usr-003", 
-      # Guarda la contraseña "pass123" hasheada
       "auth": {"username": "agomez", "password_hash": get_password_hash("pass123")}, 
       "roles": ["MEDICO"],
       "pii": {"dni": "25111222", "nombre": "Ana Gomez"},
       "medico": {"perfil": {"matricula": "MP-12345", "especialidad": "cardiología"}}
+    },
+    # --- ¡NUEVO ADMINISTRADOR AÑADIDO! ---
+    {
+      "_id": "usr-admin", 
+      "auth": {"username": "admin", "password_hash": get_password_hash("adminpass")}, 
+      "roles": ["ADMINISTRADOR"],
+      "pii": {"dni": "00000000", "nombre": "Admin General"}
+      # (No tiene 'paciente' ni 'medico', lo cual está bien)
     }
 ]
 VISITAS_MEDICAS = [
@@ -67,24 +72,33 @@ TURNOS = [
     {"_id": "turno-002", "ts": datetime(2025, 9, 25, 9, 30), "paciente_id": "usr-001", "medico_id": "usr-003", "estado": "realizado"}
 ]
 
-# --- Script de Carga ---
+# --- Script de Carga (¡MODIFICADO!) ---
 try:
     print(f"Conectando a MongoDB Atlas (DB: {DB_NAME})...")
-    # Usamos PyMongo (sincrónico) solo para la carga inicial
     client = pymongo.MongoClient(MONGO_URI)
     db = client[DB_NAME]
     client.admin.command('ping')
     print("¡Conexión a Mongo exitosa!")
     
-    # Limpiar colecciones
-    db.usuarios.drop()
-    db.visitas_medicas.drop()
-    db.habitos.drop()
-    db.turnos.drop()
-    print("Colecciones de Mongo limpiadas.")
+    # --- ¡LÓGICA DE LIMPIEZA ACTUALIZADA! ---
+    # NO borramos usuarios. Limpiamos las colecciones de datos de EJEMPLO.
+    db.visitas_medicas.delete_many({})
+    db.habitos.drop() # Se dropea para recrearla como TimeSeries
+    db.turnos.delete_many({})
+    print("Contenido de colecciones (visitas, habitos, turnos) limpiado.")
 
-    # Insertar datos
-    db.usuarios.insert_many(USUARIOS)
+    # --- ¡LÓGICA DE USUARIOS ACTUALIZADA! ---
+    # Carga Idempotente: Actualiza los usuarios base si existen, o los crea si no.
+    # NO borra a los usuarios registrados por la web.
+    print("Actualizando usuarios base (Juan, Maria, Ana, Admin)...")
+    user_ops = [
+        ReplaceOne({"_id": user["_id"]}, user, upsert=True) for user in USUARIOS
+    ]
+    if user_ops:
+        db.usuarios.bulk_write(user_ops)
+        print(f"{len(user_ops)} usuarios base actualizados/creados.")
+    
+    # Insertar datos de ejemplo (estos sí se borran y recargan)
     db.visitas_medicas.insert_many(VISITAS_MEDICAS)
     db.turnos.insert_many(TURNOS)
     
@@ -98,7 +112,7 @@ try:
         print("Colección 'habitos' ya existe.")
         
     db.habitos.insert_many(HABITOS_DATA)
-    print("¡Datos de MongoDB cargados exitosamente!")
+    print("¡Datos de MongoDB cargados/actualizados exitosamente!")
 
 except Exception as e:
     print(f"ERROR cargando MongoDB: {e}")

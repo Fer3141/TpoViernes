@@ -7,55 +7,83 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        #dashboard-screen { display: none; }
+        /* Ocultar Vistas */
+        #dashboard-medico-screen, #dashboard-admin-screen, #confirmation-modal { display: none; }
+        
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Estilos Pestañas Login */
+        .login-tab.active { border-bottom: 2px solid #0284c7; color: #0284c7; }
+        .login-tab { border-bottom: 2px solid transparent; }
     </style>
 </head>
 <body class="bg-gray-100 h-screen">
 
     <div id="login-screen" class="flex items-center justify-center h-full">
-        <form id="login-form" class="p-8 bg-white rounded-lg shadow-xl w-96">
-            <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">VidaSana (Profesional)</h2>
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario (Médico)</label>
-                <input id="username" type="text" value="agomez" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+        <div class="p-8 bg-white rounded-lg shadow-xl w-96">
+            
+            <div class="flex border-b mb-6">
+                <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Ingresar (Médico)</button>
+                <button id="tab-btn-admin" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Admin</button>
             </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
-                <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+
+            <div id="login-pane">
+                <form id="login-form">
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Acceso Profesional</h2>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario (Médico)</label>
+                        <input id="username" type="text" value="agomez" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
+                        <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+                    </div>
+                    <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
+                </form>
             </div>
-            <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
-            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
-        </form>
+
+            <div id="admin-pane" class="hidden">
+                <form id="admin-login-form">
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Panel Administrador</h2>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="admin-username">Usuario (Admin)</label>
+                        <input id="admin-username" type="text" value="admin" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="admin-password">Contraseña</label>
+                        <input id="admin-password" type="password" value="adminpass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+                    </div>
+                    <div id="admin-login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+                    <button type="submit" class="bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar como Admin</button>
+                </form>
+            </div>
+        </div>
     </div>
 
-    <div id="dashboard-screen" class="h-screen flex-col bg-gray-100">
+    <div id="dashboard-medico-screen" class="h-screen flex-col bg-gray-100">
         <header class="flex items-center justify-between p-4 bg-white border-b shadow-sm">
-            <h1 class="text-2xl font-bold text-sky-700">Dashboard Profesional</h1>
+            <h1 class="text-2xl font-bold text-sky-700">Dashboard Profesional (Médico)</h1>
             <div class="flex items-center space-x-4">
                 <span class="text-gray-700 hidden sm:block">Hola, <span id="user-name" class="font-semibold"></span></span>
-                <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                <button id="logout-button-medico" class="logout-btn text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
             </div>
         </header>
 
-        <main class="flex-1 flex flex-col p-6 overflow-hidden">
-            <div class="mb-4">
+        <main class="flex-1 flex flex-col p-6 overflow-hidden"> <div class="mb-4">
                 <label for="paciente-select" class="block text-sm font-medium text-gray-700 mb-1">Seleccionar Paciente</label>
                 <select id="paciente-select" class="w-full max-w-xs p-2 border rounded-md shadow-sm"></select>
             </div>
             
-            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
-                <nav class="flex space-x-2 mb-6 border-b border-gray-200">
+            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg"> <nav class="flex space-x-2 mb-6 border-b border-gray-200">
                     <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-500 text-blue-600"><i data-lucide="user" class="w-4 h-4"></i><span>Perfil</span></button>
                     <button data-tab="visitas" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clipboard" class="w-4 h-4"></i><span>Visitas</span></button>
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Hábitos</span></button>
                     <button data-tab="red" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="network" class="w-4 h-4"></i><span>Red y Riesgos</span></button>
                 </nav>
-
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
-
                 <div id="tab-content">
                     <div id="perfil-content" class="tab-pane"></div>
                     <div id="visitas-content" class="tab-pane hidden"></div>
@@ -66,111 +94,210 @@
         </main>
     </div>
 
+    <div id="dashboard-admin-screen" class="h-screen flex-col bg-gray-100">
+        <header class="flex items-center justify-between p-4 bg-gray-800 text-white border-b shadow-sm">
+            <h1 class="text-2xl font-bold">Dashboard (Administrador)</h1>
+            <div class="flex items-center space-x-4">
+                <span class="hidden sm:block">Hola, <span id="admin-user-name" class="font-semibold"></span></span>
+                <button id="logout-button-admin" class="logout-btn text-gray-300 hover:text-red-500"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+            </div>
+        </header>
+
+        <main class="flex-1 flex flex-col p-6 overflow-auto">
+            <div class="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto w-full"> <h2 class="text-2xl font-bold text-gray-800 mb-6">Crear Nuevo Médico</h2>
+                <form id="create-medico-form" class="space-y-4">
+                    <h3 class="text-lg font-semibold border-b pb-2">Datos de Acceso</h3>
+                    <input id="medico-username" type="text" placeholder="Nombre de Usuario (ej: rlopez)" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-password" type="password" placeholder="Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <h3 class="text-lg font-semibold border-b pb-2 pt-4">Información Personal (PII)</h3>
+                    <input id="medico-nombre" type="text" placeholder="Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-dni" type="text" placeholder="DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-email" type="email" placeholder="Email" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <div>
+                        <label class="text-sm text-gray-500">Fecha de Nacimiento</label>
+                        <input id="medico-fecha-nac" type="date" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    </div>
+                    <h3 class="text-lg font-semibold border-b pb-2 pt-4">Perfil Profesional</h3>
+                    <input id="medico-matricula" type="text" placeholder="Matrícula" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-especialidad" type="text" placeholder="Especialidad (ej: cardiología)" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <div id="create-medico-status" class="text-sm mb-4 hidden"></div>
+                    <button type="submit" class="bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded w-full">Crear Médico</button>
+                </form>
+            </div>
+            <div class="h-12"></div> 
+        </main>
+    </div>
+
+    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <div class="flex flex-col items-center text-center">
+                    <div class="bg-orange-100 p-3 rounded-full">
+                        <i data-lucide="alert-triangle" class="w-8 h-8 text-orange-500"></i>
+                    </div>
+                    <h3 id="modal-title" class="text-2xl font-semibold text-gray-800 mt-4">¿Cerrar sesión?</h3>
+                    <p id="modal-message" class="text-gray-600 mt-2">¿Estás seguro de que deseas cerrar tu sesión actual?</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-8">
+                    <button id="modal-btn-cancel" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
+                        Cancelar
+                    </button>
+                    <button id="modal-btn-confirm" class="py-2 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                        Sí, Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         const API_URL = 'http://localhost:8000';
         let currentToken = null;
         let currentUser = null; 
 
-        // --- Selectores ---
+        // --- Selectores (Generales) ---
         const loginScreen = document.getElementById('login-screen');
+        const logoutButtons = document.querySelectorAll('.logout-btn');
+        
+        // --- Selectores (Login) ---
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
-        const dashboardScreen = document.getElementById('dashboard-screen');
+        const adminLoginForm = document.getElementById('admin-login-form');
+        const adminLoginError = document.getElementById('admin-login-error');
+        const tabBtnLogin = document.getElementById('tab-btn-login');
+        const tabBtnAdmin = document.getElementById('tab-btn-admin');
+        const loginPane = document.getElementById('login-pane');
+        const adminPane = document.getElementById('admin-pane');
+
+        // --- Selectores (Dashboard Médico) ---
+        const dashboardMedicoScreen = document.getElementById('dashboard-medico-screen');
         const userName = document.getElementById('user-name');
-        const logoutButton = document.getElementById('logout-button');
         const pacienteSelect = document.getElementById('paciente-select');
         const tabButtons = document.querySelectorAll('.tab-button');
         const tabPanes = document.querySelectorAll('.tab-pane');
         const loadingSpinner = document.getElementById('loading-spinner');
         const contentError = document.getElementById('content-error');
 
-        // --- (¡NUEVO!) Helper de API (movido a scope global) ---
-        const fetchApi = async (url) => {
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
-            if (!res.ok) { 
-                const err = await res.json(); 
-                throw new Error(err.detail || 'Error de API'); 
-            }
+        // --- Selectores (Dashboard Admin) ---
+        const dashboardAdminScreen = document.getElementById('dashboard-admin-screen');
+        const adminUserName = document.getElementById('admin-user-name');
+        const createMedicoForm = document.getElementById('create-medico-form');
+        const createMedicoStatus = document.getElementById('create-medico-status');
+
+        // --- Selectores (Modal) ---
+        const modal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalBtnConfirm = document.getElementById('modal-btn-confirm');
+        const modalBtnCancel = document.getElementById('modal-btn-cancel');
+        let modalConfirmCallback = null;
+
+        // --- Lógica del Modal ---
+        function showConfirmationModal(title, message, onConfirmCallback) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalConfirmCallback = onConfirmCallback; 
+            modal.style.display = 'flex';
+            lucide.createIcons(); 
+        }
+        function hideModal() {
+            modal.style.display = 'none';
+            modalConfirmCallback = null;
+        }
+        modalBtnCancel.addEventListener('click', hideModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+        modalBtnConfirm.addEventListener('click', () => {
+            if (modalConfirmCallback) modalConfirmCallback();
+            hideModal();
+        });
+
+        // --- Helper de API ---
+        const fetchApi = async (url, options = {}) => {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${currentToken}` };
+            const res = await fetch(url, options);
+            if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error de API'); }
             return res.json();
         };
 
-        // --- Login (¡ACTUALIZADO!) ---
-        async function handleLogin(e) {
+        // --- Login ---
+        async function handleLogin(e, role) {
             e.preventDefault();
-            loginError.classList.add('hidden');
+            const isMedico = role === 'medico';
+            const username = document.getElementById(isMedico ? 'username' : 'admin-username').value;
+            const password = document.getElementById(isMedico ? 'password' : 'admin-password').value;
+            const errorDiv = isMedico ? loginError : adminLoginError;
+            errorDiv.classList.add('hidden');
             const formData = new URLSearchParams();
-            formData.append('username', document.getElementById('username').value);
-            formData.append('password', document.getElementById('password').value);
-
+            formData.append('username', username);
+            formData.append('password', password);
             try {
-                // 1. Pedir el token
                 const res = await fetch(`${API_URL}/token`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData,
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
                 const tokenData = await res.json();
                 currentToken = tokenData.access_token;
                 localStorage.setItem('vidasana_token', currentToken);
-                
-                // 2. Usar el token para pedir info del médico
                 currentUser = await fetchApi(`${API_URL}/usuarios/me`);
-
-                // 3. Validar que sea Médico
-                if (!currentUser.roles.includes("MEDICO")) {
-                    throw new Error("Acceso denegado. Se requiere rol de MÉDICO.");
+                if (isMedico) {
+                    if (!currentUser.roles.includes("MEDICO")) {
+                        throw new Error("Acceso denegado. Se requiere rol de MÉDICO.");
+                    }
+                    const pacientes = await fetchApi(`${API_URL}/medico/${currentUser._id}/pacientes`);
+                    await showDashboardMedico(pacientes);
+                } else {
+                    if (!currentUser.roles.includes("ADMINISTRADOR")) {
+                        throw new Error("Acceso denegado. Se requiere rol de ADMINISTRADOR.");
+                    }
+                    await showDashboardAdmin();
                 }
-
-                // 4. (¡NUEVO!) Cargar la lista de pacientes del médico
-                // (Usamos currentUser._id porque es el JSON crudo de la API)
-                const pacientes = await fetchApi(`${API_URL}/medico/${currentUser._id}/pacientes`);
-                
-                // 5. Mostrar Dashboard (pasando la lista de pacientes)
-                await showDashboard(pacientes);
-
             } catch (error) {
                 console.error("Error en el login:", error);
-                loginError.textContent = error.message;
-                loginError.classList.remove('hidden');
-                handleLogout(); // Limpiar token si falla
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('hidden');
+                handleLogout();
             }
         }
         
-        // --- (¡ACTUALIZADO!) ---
-        async function showDashboard(pacientes) {
+        // --- Mostrar Dashboards ---
+        async function showDashboardMedico(pacientes) {
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
-            dashboardScreen.style.display = 'flex';
-            
-            // (¡ACTUALIZADO!) Carga dinámica de pacientes
+            dashboardMedicoScreen.style.display = 'flex';
+            dashboardAdminScreen.style.display = 'none';
             if (pacientes && pacientes.length > 0) {
                 pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-                // Cargar datos del primer paciente
                 await fetchDataForPatient(pacientes[0].id);
             } else {
                 pacienteSelect.innerHTML = `<option value="">No tiene pacientes con turnos pendientes</option>`;
-                // Limpiar el dashboard
                 tabPanes.forEach(pane => pane.innerHTML = '<p>No hay pacientes seleccionados.</p>');
                 loadingSpinner.classList.add('hidden');
             }
+        }
+        async function showDashboardAdmin() {
+            adminUserName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
+            loginScreen.style.display = 'none';
+            dashboardMedicoScreen.style.display = 'none';
+            dashboardAdminScreen.style.display = 'flex';
         }
 
         function handleLogout() {
             localStorage.removeItem('vidasana_token');
             currentToken = null; currentUser = null;
             loginScreen.style.display = 'flex';
-            dashboardScreen.style.display = 'none';
+            dashboardMedicoScreen.style.display = 'none';
+            dashboardAdminScreen.style.display = 'none';
         }
 
-        // --- Carga de Datos (Req 6) ---
+        // --- Carga de Datos (Médico) ---
         async function fetchDataForPatient(pacienteId) {
             if (!pacienteId) return;
             loadingSpinner.classList.remove('hidden');
             contentError.classList.add('hidden');
             tabPanes.forEach(pane => pane.innerHTML = ''); 
-
             try {
                 const [perfil, visitas, habitos, red, riesgos] = await Promise.all([
                     fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`),
@@ -179,12 +306,10 @@
                     fetchApi(`${API_URL}/paciente/${pacienteId}/red_cuidado`),
                     fetchApi(`${API_URL}/paciente/${pacienteId}/familiares_con_riesgo?riesgo=diabetes`)
                 ]);
-
                 renderPerfil(perfil);
                 renderVisitas(visitas);
                 renderHabitos(habitos);
                 renderRed(red, riesgos);
-                
             } catch (err) {
                 console.error("Error fetching data:", err);
                 contentError.textContent = `Error: ${err.message}`;
@@ -195,8 +320,7 @@
             }
         }
         
-        // --- Funciones de Renderizado (Sin cambios) ---
-        
+        // --- Funciones de Renderizado (Médico) ---
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
@@ -218,161 +342,77 @@
             `;
             document.getElementById('btn-guardar-os').addEventListener('click', () => handleGuardarOS(perfil._id));
         }
-        
-        function renderVisitas(visitas) {
+        function renderVisitas(visitas) { /* (Sin cambios) */ 
             let html = '<h3 class="text-xl font-semibold text-gray-800">Historia Clínica</h3>';
-            if (visitas.length === 0) {
-                html += '<p>No hay visitas registradas.</p>';
-            } else {
-                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
-                        <thead class="bg-gray-50"><tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diagnóstico</th>
-                        </tr></thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${visitas.map(v => `
-                                <tr>
-                                    <td class="px-6 py-4">${new Date(v.ts.$date).toLocaleDateString()}</td>
-                                    <td class="px-6 py-4">${v.especialidad}</td>
-                                    <td class="px-6 py-4">${v.diagnosticos?.join(', ') || 'N/A'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody></table>`;
+            if (visitas.length === 0) { html += '<p>No hay visitas registradas.</p>'; } else {
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diagnóstico</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${visitas.map(v => `<tr><td class="px-6 py-4">${new Date(v.ts.$date).toLocaleDateString()}</td><td class="px-6 py-4">${v.especialidad}</td><td class="px-6 py-4">${v.diagnosticos?.join(', ') || 'N/A'}</td></tr>`).join('')}</tbody></table>`;
             }
             document.getElementById('visitas-content').innerHTML = html;
         }
-
-        function renderHabitos(habitos) {
+        function renderHabitos(habitos) { /* (Sin cambios) */
              let html = '<h3 class="text-xl font-semibold text-gray-800">Seguimiento de Hábitos</h3>';
-            if (habitos.length === 0) {
-                html += '<p>No hay hábitos registrados.</p>';
-            } else {
-                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
-                        <thead class="bg-gray-50"><tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
-                        </tr></thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${habitos.map(h => `
-                                <tr>
-                                    <td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td>
-                                    <td class="px-6 py-4">${h.tipo}</td>
-                                    <td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody></table>`;
+            if (habitos.length === 0) { html += '<p>No hay hábitos registrados.</p>'; } else {
+                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${habitos.map(h => `<tr><td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td><td class="px-6 py-4">${h.tipo}</td><td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td></tr>`).join('')}</tbody></table>`;
             }
             document.getElementById('habitos-content').innerHTML = html;
         }
-
-        function renderRed(red, riesgos) {
-            const redHtml = (red?.medicos_tratantes.length > 0)
-                ? `<ul class="list-disc list-inside">${red.medicos_tratantes.map(m => `<li>${m.nombre_medico} (${m.rol})</li>`).join('')}</ul>`
-                : 'Sin datos de red.';
-            
-            const riesgoHtml = (riesgos?.familiares_con_riesgo.length > 0)
-                ? `<ul class="list-disc list-inside">${riesgos.familiares_con_riesgo.map(f => `<li class="text-red-600">${f.nombre_familiar}</li>`).join('')}</ul>`
-                : 'Sin riesgos familiares detectados.';
-            
+        function renderRed(red, riesgos) { /* (Sin cambios) */
+            const redHtml = (red?.medicos_tratantes.length > 0) ? `<ul class="list-disc list-inside">${red.medicos_tratantes.map(m => `<li>${m.nombre_medico} (${m.rol})</li>`).join('')}</ul>` : 'Sin datos de red.';
+            const riesgoHtml = (riesgos?.familiares_con_riesgo.length > 0) ? `<ul class="list-disc list-inside">${riesgos.familiares_con_riesgo.map(f => `<li class="text-red-600">${f.nombre_familiar}</li>`).join('')}</ul>` : 'Sin riesgos familiares detectados.';
             document.getElementById('red-content').innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-6">
-                        <div>
-                            <h3 class="text-xl font-semibold">Red de Cuidado</h3>
-                            <div class="p-4 bg-gray-50 rounded-lg border mt-2">
-                                <h4 class="font-semibold mb-2">Médicos Tratantes (Neo4j):</h4>
-                                ${redHtml}
-                            </div>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-semibold">Riesgos Familiares</h3>
-                            <div class="p-4 bg-red-50 border border-red-200 rounded-lg mt-2">
-                                <h4 class="font-semibold text-red-700 mb-2">Riesgo 'diabetes' en familiares:</h4>
-                                ${riesgoHtml}
-                            </div>
-                        </div>
+                        <div><h3 class="text-xl font-semibold">Red de Cuidado</h3><div class="p-4 bg-gray-50 rounded-lg border mt-2"><h4 class="font-semibold mb-2">Médicos Tratantes (Neo4j):</h4>${redHtml}</div></div>
+                        <div><h3 class="text-xl font-semibold">Riesgos Familiares</h3><div class="p-4 bg-red-50 border border-red-200 rounded-lg mt-2"><h4 class="font-semibold text-red-700 mb-2">Riesgo 'diabetes' en familiares:</h4>${riesgoHtml}</div></div>
                     </div>
                     <div class="space-y-6">
-                         <div>
-                            <h3 class="text-xl font-semibold">Cálculo de Riesgo (Mongo)</h3>
-                            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-2">
-                                <p class="text-sm text-gray-600 mb-4">Selecciona un riesgo para calcularlo basado en hábitos y diagnósticos.</p>
-                                <select id="select-riesgo-tipo" class="mb-2 w-full p-2 border rounded-md">
-                                    <option value="diabetes">Diabetes</option>
-                                    <option value="hipertension">Hipertensión</option>
-                                </select>
-                                <button id="btn-calcular-riesgo" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Calcular Riesgo (POST)</button>
-                                <div id="riesgo-calculado-resultado" class="mt-4 space-y-3"></div>
-                            </div>
-                         </div>
-                         <div>
-                            <h3 class="text-xl font-semibold">Asignación de Riesgo (Neo4j)</h3>
-                            <div class="p-4 bg-gray-50 border rounded-lg mt-2">
-                                <p class="text-sm text-gray-600 mb-4">Asigna un diagnóstico permanente a la red del paciente (ej: diabetes, celiaquia).</p>
-                                <div class="flex space-x-2">
-                                    <input id="input-asignar-riesgo" type="text" placeholder="Ej: diabetes" class="w-full p-2 border rounded-md">
-                                    <button id="btn-asignar-riesgo" class="bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded">Asignar</button>
-                                </div>
-                                <div id="asignar-riesgo-status" class="mt-2 text-sm"></div>
-                            </div>
-                         </div>
+                         <div><h3 class="text-xl font-semibold">Cálculo de Riesgo (Mongo)</h3><div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Selecciona un riesgo para calcularlo.</p><select id="select-riesgo-tipo" class="mb-2 w-full p-2 border rounded-md"><option value="diabetes">Diabetes</option><option value="hipertension">Hipertensión</option></select><button id="btn-calcular-riesgo" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Calcular Riesgo (POST)</button><div id="riesgo-calculado-resultado" class="mt-4 space-y-3"></div></div></div>
+                         <div><h3 class="text-xl font-semibold">Asignación de Riesgo (Neo4j)</h3><div class="p-4 bg-gray-50 border rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Asigna un diagnóstico permanente al paciente.</p><div class="flex space-x-2"><input id="input-asignar-riesgo" type="text" placeholder="Ej: diabetes" class="w-full p-2 border rounded-md"><button id="btn-asignar-riesgo" class="bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded">Asignar</button></div><div id="asignar-riesgo-status" class="mt-2 text-sm"></div></div></div>
                     </div>
-                </div>
-            `;
-            
+                </div>`;
             document.getElementById('btn-calcular-riesgo').addEventListener('click', () => handleCalcularRiesgo(red.pacienteId));
             document.getElementById('btn-asignar-riesgo').addEventListener('click', () => handleAsignarRiesgo(red.pacienteId));
         }
         
-        // --- Handlers (Sin cambios) ---
+        // --- Handlers (Médico - ¡ACTUALIZADOS CON MODAL!) ---
+        
         async function handleGuardarOS(pacienteId) {
             const statusDiv = document.getElementById('os-save-status');
             const input = document.getElementById('input-obra-social');
-            statusDiv.textContent = 'Guardando...';
-            try {
-                const res = await fetch(`${API_URL}/paciente/${pacienteId}/perfil`, {
-                    method: 'PATCH',
-                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ "obra_social": input.value })
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                statusDiv.textContent = '¡Guardado con éxito!';
-                statusDiv.className = 'text-sm mt-2 text-green-600';
-            } catch (error) {
-                statusDiv.textContent = `Error: ${error.message}`;
-                statusDiv.className = 'text-sm mt-2 text-red-600';
-            }
+            showConfirmationModal(
+                "¿Guardar Cambios?",
+                `¿Estás seguro de que deseas actualizar la obra social a "${input.value}"?`,
+                async () => { 
+                    statusDiv.textContent = 'Guardando...';
+                    try {
+                        await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ "obra_social": input.value })
+                        });
+                        statusDiv.textContent = '¡Guardado con éxito!';
+                        statusDiv.className = 'text-sm mt-2 text-green-600';
+                    } catch (error) {
+                        statusDiv.textContent = `Error: ${error.message}`;
+                        statusDiv.className = 'text-sm mt-2 text-red-600';
+                    }
+                }
+            );
         }
-
         async function handleCalcularRiesgo(pacienteId) {
             const resultadoDiv = document.getElementById('riesgo-calculado-resultado');
             const boton = document.getElementById('btn-calcular-riesgo');
             const riesgoTipo = document.getElementById('select-riesgo-tipo').value;
-            
             const tempStatusDiv = document.createElement('div');
             tempStatusDiv.className = 'text-gray-500';
             tempStatusDiv.textContent = `Calculando ${riesgoTipo}...`;
             resultadoDiv.prepend(tempStatusDiv);
             boton.disabled = true;
-
             try {
-                const res = await fetch(`${API_URL}/paciente/${pacienteId}/calcular_riesgo?riesgo=${riesgoTipo}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${currentToken}` }
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                const data = await res.json();
-                
+                const data = await fetchApi(`${API_URL}/paciente/${pacienteId}/calcular_riesgo?riesgo=${riesgoTipo}`, { method: 'POST' });
                 let color = {"bajo": "text-green-700", "medio": "text-yellow-700", "alto": "text-red-700"}[data.score] || "text-gray-700";
                 tempStatusDiv.className = 'p-3 border rounded-md bg-gray-50';
-                tempStatusDiv.innerHTML = `
-                    <p class="font-semibold">Resultado: ${data.tipo.charAt(0).toUpperCase() + data.tipo.slice(1)}</p>
-                    <p class="${color}"><strong>Score:</strong> ${data.score.toUpperCase()}</p>
-                    <p class="text-sm text-gray-600"><strong>Motivo:</strong> ${data.motivo}</p>
-                    <p class="text-xs text-gray-400 mt-2">Calculado: ${new Date(data.calculado_en).toLocaleString()}</p>
-                `;
+                tempStatusDiv.innerHTML = `<p class="font-semibold">Resultado: ${data.tipo.charAt(0).toUpperCase() + data.tipo.slice(1)}</p><p class="${color}"><strong>Score:</strong> ${data.score.toUpperCase()}</p><p class="text-sm text-gray-600"><strong>Motivo:</strong> ${data.motivo}</p><p class="text-xs text-gray-400 mt-2">Calculado: ${new Date(data.calculado_en).toLocaleString()}</p>`;
             } catch (error) {
                 tempStatusDiv.className = 'p-3 border rounded-md bg-red-50 text-red-700';
                 tempStatusDiv.innerHTML = `<p><strong>Error al calcular ${riesgoTipo}:</strong> ${error.message}</p>`;
@@ -380,45 +420,124 @@
                 boton.disabled = false;
             }
         }
-
         async function handleAsignarRiesgo(pacienteId) {
             const statusDiv = document.getElementById('asignar-riesgo-status');
             const input = document.getElementById('input-asignar-riesgo');
             const boton = document.getElementById('btn-asignar-riesgo');
             const tipoRiesgo = input.value.trim().toLowerCase();
-
             if (!tipoRiesgo) {
                 statusDiv.textContent = 'Debe ingresar un tipo de riesgo.';
                 statusDiv.className = 'mt-2 text-sm text-red-600';
                 return;
             }
-            
-            statusDiv.textContent = 'Asignando...';
-            statusDiv.className = 'mt-2 text-sm text-gray-500';
-            boton.disabled = true;
+            showConfirmationModal(
+                "¿Asignar Riesgo?",
+                `¿Estás seguro de que deseas asignar el riesgo "${tipoRiesgo}"? Esta acción es permanente.`,
+                async () => {
+                    statusDiv.textContent = 'Asignando...';
+                    boton.disabled = true;
+                    try {
+                        await fetchApi(`${API_URL}/paciente/${pacienteId}/asignar_riesgo`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ "tipo": tipoRiesgo })
+                        });
+                        statusDiv.textContent = `Riesgo '${tipoRiesgo}' asignado con éxito.`;
+                        statusDiv.className = 'mt-2 text-sm text-green-600';
+                        input.value = '';
+                    } catch (error) {
+                        statusDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+                        statusDiv.className = 'mt-2 text-sm text-red-600';
+                    } finally {
+                        boton.disabled = false;
+                    }
+                }
+            );
+        }
 
-            try {
-                const res = await fetch(`${API_URL}/paciente/${pacienteId}/asignar_riesgo`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ "tipo": tipoRiesgo })
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
-                statusDiv.textContent = `Riesgo '${tipoRiesgo}' asignado con éxito.`;
-                statusDiv.className = 'mt-2 text-sm text-green-600';
-                input.value = '';
-            } catch (error) {
-                statusDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
-                statusDiv.className = 'mt-2 text-sm text-red-600';
-            } finally {
-                boton.disabled = false;
-            }
+        // --- Handler (Admin) ---
+        async function handleCrearMedico(e) {
+            e.preventDefault();
+            createMedicoStatus.classList.add('hidden');
+            
+            // ¡NUEVO! Confirmación para el Admin
+            showConfirmationModal(
+                "¿Crear Médico?",
+                `¿Estás seguro de que deseas crear al médico ${document.getElementById('medico-nombre').value}?`,
+                async () => { // onConfirm
+                    const body = {
+                        username: document.getElementById('medico-username').value,
+                        password: document.getElementById('medico-password').value,
+                        pii: {
+                            nombre: document.getElementById('medico-nombre').value,
+                            dni: document.getElementById('medico-dni').value,
+                            email: document.getElementById('medico-email').value,
+                            fecha_nac: document.getElementById('medico-fecha-nac').value
+                        },
+                        perfil: {
+                            perfil: {
+                                matricula: document.getElementById('medico-matricula').value,
+                                especialidad: document.getElementById('medico-especialidad').value
+                            }
+                        }
+                    };
+                    createMedicoStatus.textContent = "Creando médico...";
+                    createMedicoStatus.className = 'text-sm mb-4 text-gray-500';
+                    createMedicoStatus.classList.remove('hidden');
+                    try {
+                        const data = await fetchApi(`${API_URL}/admin/crear_medico`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        createMedicoStatus.textContent = `¡Médico creado con éxito! ID: ${data._id}`;
+                        createMedicoStatus.className = 'text-sm mb-4 text-green-600';
+                        e.target.reset();
+                    } catch (error) {
+                        console.error("Error creando médico:", error);
+                        createMedicoStatus.textContent = `Error: ${error.message}`;
+                        createMedicoStatus.className = 'text-sm mb-4 text-red-600';
+                    }
+                }
+            );
         }
 
         // --- Event Listeners ---
-        loginForm.addEventListener('submit', handleLogin);
-        logoutButton.addEventListener('click', handleLogout);
+        loginForm.addEventListener('submit', (e) => handleLogin(e, 'medico'));
+        adminLoginForm.addEventListener('submit', (e) => handleLogin(e, 'admin'));
+        createMedicoForm.addEventListener('submit', handleCrearMedico);
+
+        logoutButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                showConfirmationModal(
+                    "¿Cerrar sesión?", 
+                    "¿Estás seguro de que deseas cerrar tu sesión actual?",
+                    handleLogout 
+                );
+            });
+        });
+
+        // Pestañas de Login
+        function switchLoginTabs(targetTab) {
+            if (targetTab === 'login') {
+                loginPane.classList.remove('hidden');
+                adminPane.classList.add('hidden');
+                tabBtnLogin.classList.add('active');
+                tabBtnAdmin.classList.remove('active');
+                tabBtnAdmin.classList.add('text-gray-500');
+            } else {
+                loginPane.classList.add('hidden');
+                adminPane.classList.remove('hidden');
+                tabBtnLogin.classList.remove('active');
+                tabBtnLogin.classList.add('text-gray-500');
+                tabBtnAdmin.classList.add('active');
+                tabBtnAdmin.classList.remove('text-gray-500');
+            }
+        }
+        tabBtnLogin.addEventListener('click', () => switchLoginTabs('login'));
+        tabBtnAdmin.addEventListener('click', () => switchLoginTabs('admin'));
+
+        // Pestañas de Dashboard (Médico)
         pacienteSelect.addEventListener('change', (e) => fetchDataForPatient(e.target.value));
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {

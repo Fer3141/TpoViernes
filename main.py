@@ -33,7 +33,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # --- Inicializar FastAPI ---
-app = FastAPI(title="API VidaSana (Políglota)", version="4.1 - Corregida")
+app = FastAPI(title="API VidaSana (Políglota)", version="4.2 - Con Admin")
 
 # --- Configuración de CORS ---
 origins = [
@@ -58,14 +58,13 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-# --- ¡AQUÍ ESTÁ LA CORRECCIÓN 1/2! ---
 class UsuarioEnDB(BaseModel):
-    id: str = Field(..., alias="_id") # Mapea _id de Mongo a un campo publico 'id'
+    id: str = Field(..., alias="_id") 
     auth: dict
     roles: List[str]
     class Config:
         arbitrary_types_allowed = True 
-        populate_by_name = True # Permite que el alias funcione correctamente
+        populate_by_name = True
 
 class TurnoInput(BaseModel):
     id: str = Field(..., alias="_id") 
@@ -102,26 +101,23 @@ class UsuarioCreate(BaseModel):
     paciente: Optional[PacienteData] = None
     medico: Optional[MedicoData] = None
 
-# ... (después de la clase UsuarioCreate) ...
-
 class PacienteUpdate(BaseModel):
     obra_social: Optional[str] = None
     clinico: Optional[Dict[str, Any]] = None 
 
-# --- (¡NUEVO!) Modelo para Auto-Registro de Paciente ---
+# (¡NUEVO!) Modelo para Auto-Registro de Paciente
 class PacienteRegister(BaseModel):
     username: str
     password: str 
     pii: PII
     obra_social: Optional[str] = None
-# --- Fin del nuevo modelo ---
 
-class AsignarPaciente(BaseModel):
-    paciente_id: str
-
-class PacienteUpdate(BaseModel):
-    obra_social: Optional[str] = None
-    clinico: Optional[Dict[str, Any]] = None 
+# (¡NUEVO!) Modelo para Creación de Médico (Admin)
+class MedicoCreate(BaseModel):
+    username: str
+    password: str 
+    pii: PII
+    perfil: MedicoData # Matrícula, especialidad, etc.
 
 class AsignarPaciente(BaseModel):
     paciente_id: str
@@ -243,7 +239,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- (¡NUEVO!) Endpoint de Auto-Registro Público para Pacientes ---
+# --- Endpoint de Auto-Registro Público para Pacientes ---
 @app.post("/register/paciente", status_code=status.HTTP_201_CREATED)
 async def register_paciente(user_in: PacienteRegister):
     """
@@ -253,99 +249,93 @@ async def register_paciente(user_in: PacienteRegister):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
 
-    # 1. Verificar si el usuario o DNI ya existen
     existing_user = await mongo_db.usuarios.find_one({
-        "$or": [
-            {"auth.username": user_in.username},
-            {"pii.dni": user_in.pii.dni}
-        ]
+        "$or": [{"auth.username": user_in.username}, {"pii.dni": user_in.pii.dni}]
     })
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, 
-            detail="El nombre de usuario o DNI ya están registrados."
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, 
+            detail="El nombre de usuario o DNI ya están registrados.")
 
-    # 2. Generar el documento de usuario
-    
-    # Creamos un ID único para el paciente (ej: usr-p-12345678)
     user_id = f"usr-p-{user_in.pii.dni}"
     hashed_password = get_password_hash(user_in.password)
-
     user_doc = {
         "_id": user_id,
-        "auth": {
-            "username": user_in.username,
-            "password_hash": hashed_password
-        },
-        "roles": ["PACIENTE"], # ¡Rol asignado automáticamente!
+        "auth": {"username": user_in.username, "password_hash": hashed_password},
+        "roles": ["PACIENTE"],
         "pii": user_in.pii.dict(),
-        "paciente": {
-            "obra_social": user_in.obra_social,
-            "clinico": {} # Objeto clínico vacío inicial
-        },
+        "paciente": {"obra_social": user_in.obra_social, "clinico": {}},
         "medico": None
     }
     
-    # 3. Insertar en MongoDB
     try:
         await mongo_db.usuarios.insert_one(user_doc)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al guardar en Mongo: {e}")
 
-    # 4. Crear nodo en Neo4j
-    query = """
-    MERGE (u:Usuario:Paciente {userId: $id}) 
-    SET u.nombre = $nombre
-    """
+    query = "MERGE (u:Usuario:Paciente {userId: $id}) SET u.nombre = $nombre"
     try:
         async with neo4j_driver.session(database="neo4j") as session:
             await session.run(query, id=user_id, nombre=user_in.pii.nombre)
     except Exception as e:
-        # (Nota: en producción, aquí manejaríamos un rollback de Mongo si Neo4j falla)
         raise HTTPException(status_code=500, detail=f"Error al crear nodo en Neo4j: {e}")
 
     return {"status": "paciente registrado exitosamente", "_id": user_id}
 
-# --- ¡AQUÍ ESTÁ LA CORRECCIÓN 2/2! (en esta función) ---
-@app.get("/usuarios/me")
-async def read_users_me(current_user: UsuarioEnDB = Depends(get_current_user)):
+# --- (¡NUEVO!) Endpoint para que el Admin cree Médicos ---
+@app.post("/admin/crear_medico", status_code=status.HTTP_201_CREATED)
+async def admin_crear_medico(
+    user_in: MedicoCreate, 
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
     """
-    (Req 1) Obtiene el perfil completo del usuario actualmente autenticado.
-    Esto es usado por AMBOS dashboards (paciente y profesional) al iniciar.
+    Permite a un Administrador crear un nuevo usuario Médico.
+    ¡Requiere rol 'ADMINISTRADOR'!
     """
-    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # ¡CORREGIDO! Se usa current_user.id (en lugar de current_user._id)
-    user_data = await mongo_db.usuarios.find_one({"_id": current_user.id})
-    if not user_data:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return parse_json(user_data)
+    if "ADMINISTRADOR" not in current_user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acción no autorizada. Se requiere rol de Administrador.")
 
-@app.post("/usuarios", status_code=status.HTTP_201_CREATED)
-async def crear_usuario(user_in: UsuarioCreate, current_user: UsuarioEnDB = Depends(get_current_user)):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
-    
+
+    existing_user = await mongo_db.usuarios.find_one({
+        "$or": [{"auth.username": user_in.username}, {"pii.dni": user_in.pii.dni}]
+    })
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, 
+            detail="El nombre de usuario o DNI ya están registrados.")
+
+    user_id = f"usr-m-{user_in.pii.dni}"
     hashed_password = get_password_hash(user_in.password)
-    user_doc = user_in.dict(exclude={"password"}, exclude_none=True) 
-    user_doc["auth"] = {"username": user_in.username, "password_hash": hashed_password}
+    user_doc = {
+        "_id": user_id,
+        "auth": {"username": user_in.username, "password_hash": hashed_password},
+        "roles": ["MEDICO"], # Rol asignado automáticamente
+        "pii": user_in.pii.dict(),
+        "paciente": None,
+        "medico": user_in.perfil.dict(exclude_none=True)
+    }
     
     try:
         await mongo_db.usuarios.insert_one(user_doc)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al guardar en Mongo: {e}")
 
-    query = "MERGE (u:Usuario {userId: $id}) SET u.nombre = $nombre"
-    if "PACIENTE" in user_in.roles: query += " SET u:Paciente"
-    if "MEDICO" in user_in.roles: query += " SET u:Medico"
+    query = "MERGE (u:Usuario:Medico {userId: $id}) SET u.nombre = $nombre"
     try:
         async with neo4j_driver.session(database="neo4j") as session:
-            await session.run(query, id=user_in._id, nombre=user_in.pii.nombre)
+            await session.run(query, id=user_id, nombre=user_in.pii.nombre)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear nodo en Neo4j: {e}")
 
-    return {"status": "usuario creado en Mongo y Neo4j", "_id": user_in._id}
+    return {"status": "médico registrado exitosamente", "_id": user_id}
+
+@app.get("/usuarios/me")
+async def read_users_me(current_user: UsuarioEnDB = Depends(get_current_user)):
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    user_data = await mongo_db.usuarios.find_one({"_id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return parse_json(user_data)
 
 @app.patch("/paciente/{paciente_id}/perfil")
 async def actualizar_perfil_paciente(
@@ -354,8 +344,6 @@ async def actualizar_perfil_paciente(
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # ¡CORREGIDO!
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     
@@ -377,8 +365,6 @@ async def actualizar_perfil_paciente(
 @app.get("/paciente/{paciente_id}/perfil")
 async def get_paciente_perfil(paciente_id: str, current_user: UsuarioEnDB = Depends(get_current_user)):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # ¡CORREGIDO!
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     
@@ -393,8 +379,6 @@ async def get_paciente_visitas(
     current_user: UsuarioEnDB = Depends(get_current_user), 
 ):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # ¡CORREGIDO!
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     
@@ -414,12 +398,10 @@ async def registrar_habito(
 ):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if redis_client is None: raise HTTPException(503, "Redis no conectado")
-
     if "PACIENTE" not in current_user.roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo los pacientes pueden registrar hábitos")
 
     habito_doc = habito_in.dict()
-    # ¡CORREGIDO!
     habito_doc["paciente_id"] = current_user.id
     habito_doc["ts"] = datetime.now(timezone.utc)
 
@@ -438,8 +420,6 @@ async def registrar_habito(
 @app.get("/paciente/{paciente_id}/habitos")
 async def get_paciente_habitos(paciente_id: str, current_user: UsuarioEnDB = Depends(get_current_user)):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # ¡CORREGIDO!
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     
@@ -458,8 +438,6 @@ async def asignar_paciente_a_medico(
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
     if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
-    
-    # ¡CORREGIDO!
     if "MEDICO" not in current_user.roles or current_user.id != medico_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
@@ -516,10 +494,9 @@ async def crear_nuevo_turno(turno: TurnoInput, current_user: UsuarioEnDB = Depen
     })
     if conflicto:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, # Código de respuesta HTTP 409: Conflicto
+            status_code=status.HTTP_409_CONFLICT,
             detail="Conflicto de horario: El médico ya tiene un turno pendiente para esa fecha y hora exactas."
         )
-    # ¡CORREGIDO!
     if "PACIENTE" in current_user.roles and current_user.id != turno.paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No puede crear turnos para otro paciente")
     
@@ -564,64 +541,27 @@ async def actualizar_estado_turno(
     await redis_client.publish(canal, mensaje)
     return {"status": f"turno actualizado a {update.estado}", "turno_id": turno_id}
 
-# --- (¡NUEVO!) Endpoint para el Dashboard del Médico ---
+# ---
+# REQ 6 / REQ 3: Endpoints de Dashboard de Médico
+# ---
+
 @app.get("/medico/{medico_id}/pacientes")
 async def get_pacientes_del_medico(
     medico_id: str, 
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
-    """
-    (Req 6) Obtiene la lista de pacientes únicos que tienen un turno 
-    pendiente con este médico. 
-    Usa un pipeline de agregación para buscar en 'turnos' y luego 
-    hacer un $lookup con 'usuarios' para obtener los nombres.
-    """
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-
-    if "MEDICO" not in current_user.roles or current_user.id != medico_id:
+    if "MEDICO" not in current_user.roles and current_user.id != medico_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
     pipeline = [
-        {
-            # 1. Encontrar turnos pendientes para este médico
-            "$match": {
-                "medico_id": medico_id,
-                "estado": "pendiente"
-            }
-        },
-        {
-            # 2. Agrupar por paciente_id para obtener pacientes únicos
-            "$group": {
-                "_id": "$paciente_id"
-            }
-        },
-        {
-            # 3. Unir con la colección 'usuarios' para obtener datos del paciente
-            "$lookup": {
-                "from": "usuarios",
-                "localField": "_id",
-                "foreignField": "_id",
-                "as": "paciente_info"
-            }
-        },
-        {
-            # 4. Descomprimir el array (siempre será 1)
-            "$unwind": "$paciente_info"
-        },
-        {
-            # 5. Formatear la salida
-            "$project": {
-                "_id": 0,
-                "id": "$paciente_info._id",
-                "nombre": "$paciente_info.pii.nombre"
-            }
-        },
-        {
-            # 6. Ordenar por nombre
-            "$sort": {"nombre": 1}
-        }
+        {"$match": {"medico_id": medico_id, "estado": "pendiente"}},
+        {"$group": {"_id": "$paciente_id"}},
+        {"$lookup": {"from": "usuarios", "localField": "_id", "foreignField": "_id", "as": "paciente_info"}},
+        {"$unwind": "$paciente_info"},
+        {"$project": {"_id": 0, "id": "$paciente_info._id", "nombre": "$paciente_info.pii.nombre"}},
+        {"$sort": {"nombre": 1}}
     ]
-
     try:
         cursor = mongo_db.turnos.aggregate(pipeline)
         pacientes = await cursor.to_list(length=None)
@@ -629,66 +569,32 @@ async def get_pacientes_del_medico(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
 
-# --- (¡NUEVO!) Endpoint para el Dashboard del Paciente ---
 @app.get("/paciente/{paciente_id}/turnos")
 async def get_turnos_del_paciente(
     paciente_id: str, 
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
-    """
-    (Req 4) Obtiene la lista de turnos (pendientes y pasados) 
-    de un paciente específico.
-    Usa $lookup para adjuntar el nombre del médico.
-    """
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     
     pipeline = [
-        {
-            # 1. Encontrar turnos del paciente
-            "$match": {"paciente_id": paciente_id}
-        },
-        {
-            # 2. Ordenar por fecha (más próximos primero)
-            "$sort": {"ts": 1}
-        },
-        {
-            # 3. Unir con 'usuarios' para obtener el nombre del médico
-            "$lookup": {
-                "from": "usuarios",
-                "localField": "medico_id",
-                "foreignField": "_id",
-                "as": "medico_info"
-            }
-        },
-        {
-            # 4. Descomprimir (o preservar si el médico fue borrado)
-            "$unwind": {
-                "path": "$medico_info",
-                "preserveNullAndEmptyArrays": True
-            }
-        },
-        {
-            # 5. Formatear la salida
-            "$project": {
-                "_id": 1,
-                "ts": 1,
-                "estado": 1,
-                "especialidad": 1,
-                "sede": 1,
-                "medico_nombre": { "$ifNull": [ "$medico_info.pii.nombre", "N/A" ] }
-            }
-        }
+        {"$match": {"paciente_id": paciente_id}},
+        {"$sort": {"ts": 1}},
+        {"$lookup": {"from": "usuarios", "localField": "medico_id", "foreignField": "_id", "as": "medico_info"}},
+        {"$unwind": {"path": "$medico_info", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "_id": 1, "ts": 1, "estado": 1, "especialidad": 1, "sede": 1,
+            "medico_nombre": { "$ifNull": [ "$medico_info.pii.nombre", "N/A" ] }
+        }}
     ]
-    
     try:
         cursor = mongo_db.turnos.aggregate(pipeline)
         turnos = await cursor.to_list(length=100)
-        return parse_json(turnos) # Usamos parse_json por las fechas (ts)
+        return parse_json(turnos)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
+
 # ---
 # REQ 5: Evaluación de Riesgos
 # ---
@@ -717,7 +623,6 @@ async def asignar_riesgo_a_paciente(
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
     if neo4j_driver is None: raise HTTPException(503, "Neo4j no conectado")
-    
     if "MEDICO" not in current_user.roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado (se requiere rol MEDICO)")
 
@@ -805,7 +710,7 @@ async def calcular_riesgo(
 
 # --- Correr la App ---
 if __name__ == "__main__":
-    print("Iniciando API Políglota v4.1 (Corregida) en http://127.0.0.1:8000")
-    print("Dashboard Profesional (Req 6) en http://127.0.0.1:5500/index.html")
+    print("Iniciando API Políglota v4.2 (Con Admin) en http://127.0.0.1:8000")
+    print("Dashboard Profesional/Admin (Req 6) en http://127.0.0.1:5500/index.html")
     print("Dashboard Paciente (Req 1,2,4) en http://127.0.0.1:5500/paciente.html")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
