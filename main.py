@@ -286,8 +286,7 @@ async def register_paciente(user_in: PacienteRegister):
             "obra_social": user_in.obra_social,
             "numero_afiliado": user_in.numero_afiliado, 
             "clinico": {}
-        },
-        "medico": None
+        }
     }
     
     try:
@@ -580,23 +579,50 @@ async def get_turnos_del_paciente(
 ):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    pipeline = [
-        {"$match": {"paciente_id": paciente_id}},
-        {"$sort": {"ts": 1}},
-        {"$lookup": {"from": "usuarios", "localField": "medico_id", "foreignField": "_id", "as": "medico_info"}},
-        {"$unwind": {"path": "$medico_info", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "_id": 1, "ts": 1, "estado": 1, "especialidad": 1, "sede": 1,
-            "medico_nombre": { "$ifNull": [ "$medico_info.pii.nombre", "N/A" ] }
-        }}
-    ]
+        if "MEDICO" not in current_user.roles: # Permitir a Médicos ver
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     try:
+        # --- LÓGICA DE ACTUALIZACIÓN DE TURNO (SIMPLE) ---
+        # Usamos UTC para la comparación, ya que es la zona horaria del sistema de FastAPI/MongoDB
+        ahora_utc = datetime.now(timezone.utc)
+        
+        # Filtro: Turnos PENDIENTES cuya fecha (ts) es anterior a AHORA
+        update_filter = {
+            "paciente_id": paciente_id,
+            "estado": "pendiente", # <-- Usa minúsculas si así lo guardas
+            "ts": {"$lt": ahora_utc} 
+        }
+        
+        # Acción: Cambiar el estado
+        update_set = {
+            "$set": {"estado": "NO_ASISTIO", "updated_at": ahora_utc}
+        }
+
+        # Ejecutar la actualización masiva (esto es eficiente)
+        await mongo_db.turnos.update_many(
+            update_filter, 
+            update_set
+        )
+        # ---------------------------------------------------
+        
+        # Consulta para devolver los turnos (ahora actualizados)
+        pipeline = [
+            {"$match": {"paciente_id": paciente_id}},
+            {"$sort": {"ts": 1}},
+            {"$lookup": {"from": "usuarios", "localField": "medico_id", "foreignField": "_id", "as": "medico_info"}},
+            {"$unwind": {"path": "$medico_info", "preserveNullAndEmptyArrays": True}},
+            {"$project": {
+                "_id": 1, "ts": 1, "estado": 1, "especialidad": 1, "sede": 1,
+                "medico_nombre": { "$ifNull": [ "$medico_info.pii.nombre", "N/A" ] }
+            }}
+        ]
+        
         cursor = mongo_db.turnos.aggregate(pipeline)
         turnos = await cursor.to_list(length=100)
         return parse_json(turnos)
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener/actualizar turnos: {e}")
 
 # ---
 # REQ 5: Evaluación de Riesgos
@@ -710,6 +736,79 @@ async def calcular_riesgo(
     )
     return riesgo_calculado
 
+@app.patch("/turnos/{turno_id}/cancelar")
+async def cancelar_turno_paciente(
+    turno_id: str, 
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
+    """
+    Permite a un paciente cancelar su propio turno.
+    Actualiza el estado a 'CANCELADO' y envía un evento a Redis.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    
+    # 1. Obtener el turno para verificar que pertenezca al usuario logueado
+    turno = await mongo_db.turnos.find_one({"_id": turno_id})
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+        
+    if turno.get("paciente_id") != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para cancelar este turno")
+        
+    if turno.get("estado").upper() != "PENDIENTE":
+        raise HTTPException(status_code=400, detail=f"El turno ya fue {turno.get('estado').upper()}")
+
+    # 2. Actualizar el estado en MongoDB
+    result = await mongo_db.turnos.update_one(
+        {"_id": turno_id}, 
+        {"$set": {"estado": "CANCELADO", "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Turno no encontrado o ya cancelado")
+
+    # 3. Notificar vía Redis (Sistema de Eventos - Req 4)
+    canal = "eventos_turnos"
+    mensaje = json.dumps({"evento": "TURNO_CANCELADO", "turno_id": turno_id, "paciente_id": current_user.id})
+    await redis_client.publish(canal, mensaje)
+    
+    return {"status": "turno cancelado exitosamente", "turno_id": turno_id}
+@app.get("/medicos")
+async def get_all_medicos(current_user: UsuarioEnDB = Depends(get_current_user)):
+    """
+    REQ: Obtiene la lista de todos los médicos registrados.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    # La validación de current_user asegura que solo usuarios logueados accedan
+    
+    pipeline = [
+        {"$match": {"roles": "MEDICO"}},
+        {"$project": {
+            "_id": 1, 
+            "nombre": "$pii.nombre",
+            # Nota: la especialidad en el modelo de carga es un campo simple, pero el esquema permite una lista.
+            # Aquí asumimos que está en $medico.perfil.especialidad
+            "especialidad": "$medico.perfil.especialidad" 
+        }}
+    ]
+    try:
+        cursor = mongo_db.usuarios.aggregate(pipeline)
+        medicos = await cursor.to_list(length=None)
+        
+        # Formatear la especialidad si es una lista o nula
+        for medico in medicos:
+             especialidad = medico.get("especialidad")
+             if isinstance(especialidad, list):
+                 medico["especialidad"] = ", ".join(especialidad)
+             elif not especialidad:
+                 # Si el campo no existe o es None/vacío, ponemos un valor por defecto
+                 medico["especialidad"] = "General"
+
+        return parse_json(medicos)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
 # --- Correr la App ---
 if __name__ == "__main__":
     print("Iniciando API Políglota v4.3.1 (Modelo Rico Corregido) en http://127.0.0.1:8000")
