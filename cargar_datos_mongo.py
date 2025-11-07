@@ -1,6 +1,6 @@
 import os
 import pymongo
-from pymongo import ReplaceOne # <-- ¡Importante!
+from pymongo import ReplaceOne
 from datetime import datetime
 from dotenv import load_dotenv
 from passlib.context import CryptContext 
@@ -17,16 +17,29 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME")
 
-# --- Datos de ejemplo (¡Admin añadido!) ---
+# --- Datos de ejemplo (¡MODELO DE DATOS ACTUALIZADO!) ---
 USUARIOS = [
     {
       "_id": "usr-001", 
       "auth": {"username": "ljuan", "password_hash": get_password_hash("pass123")}, 
       "roles": ["PACIENTE"],
-      "pii": {"dni": "12345678", "nombre": "Juan Lopez"},
+      "pii": {
+          "dni": "12345678", 
+          "nombre": "Juan Lopez",
+          "email": "juan@example.com",
+          "fecha_nac": "1997-12-20",
+          "telefono": "+54-11-5555-1234",
+          "direccion": "Av. Rivadavia 742, Buenos Aires",
+          "pais": "AR",
+          "genero": "M"
+      },
       "paciente": {
         "obra_social": "OSDE 210",
-        "clinico": {"alergias": ["penicilina"]},
+        "numero_afiliado": "123456789-01",
+        "clinico": {
+            "alergias": ["penicilina"],
+            "grupo_sanguineo": "O+"
+        },
         "resumen": {"ultima_visita_id": "enc-002"}
       }
     },
@@ -34,10 +47,23 @@ USUARIOS = [
       "_id": "usr-002", 
       "auth": {"username": "mlopez", "password_hash": get_password_hash("pass123")}, 
       "roles": ["PACIENTE"],
-      "pii": {"dni": "23456789", "nombre": "Maria Lopez"},
+      "pii": {
+          "dni": "23456789", 
+          "nombre": "Maria Lopez",
+          "email": "maria@example.com",
+          "fecha_nac": "1990-05-15",
+          "telefono": "+54-11-5555-5678",
+          "direccion": "Calle Falsa 123, CABA",
+          "pais": "AR",
+          "genero": "F"
+      },
       "paciente": {
         "obra_social": "Swiss Medical",
-        "clinico": {"antecedentes": ["diabetes"]},
+        "numero_afiliado": "987654321-02",
+        "clinico": {
+            "antecedentes": ["diabetes"],
+            "grupo_sanguineo": "A+"
+        },
         "resumen": {}
       }
     },
@@ -45,18 +71,38 @@ USUARIOS = [
       "_id": "usr-003", 
       "auth": {"username": "agomez", "password_hash": get_password_hash("pass123")}, 
       "roles": ["MEDICO"],
-      "pii": {"dni": "25111222", "nombre": "Ana Gomez"},
-      "medico": {"perfil": {"matricula": "MP-12345", "especialidad": "cardiología"}}
+      "pii": {
+          "dni": "25111222", 
+          "nombre": "Ana Gomez",
+          "email": "agomez@vidasana.com",
+          "fecha_nac": "1985-10-01",
+          "telefono": "+54-11-5555-9012",
+          "direccion": "Av. Corrientes 2030, Buenos Aires",
+          "pais": "AR",
+          "genero": "F"
+      },
+      "medico": {
+          "perfil": {
+              "matricula": "MP-12345", 
+              "especialidad": "cardiología"
+            }
+        }
     },
-    # --- ¡NUEVO ADMINISTRADOR AÑADIDO! ---
     {
       "_id": "usr-admin", 
       "auth": {"username": "admin", "password_hash": get_password_hash("adminpass")}, 
       "roles": ["ADMINISTRADOR"],
-      "pii": {"dni": "00000000", "nombre": "Admin General"}
-      # (No tiene 'paciente' ni 'medico', lo cual está bien)
+      "pii": {
+          "dni": "00000000", 
+          "nombre": "Admin General",
+          "email": "admin@vidasana.com",
+          "fecha_nac": "1980-01-01"
+        }
     }
 ]
+# (Resto de las colecciones: VISITAS_MEDICAS, HABITOS_DATA, TURNOS... quedan igual)
+# ... (PEGAR EL RESTO DE TU SCRIPT DE CARGA AQUÍ) ...
+
 VISITAS_MEDICAS = [
     {"_id": "enc-001", "paciente_id": "usr-001", "medico_id": "usr-003", "ts": datetime(2025, 9, 25, 9, 30), "especialidad": "gastroenterologia"},
     {"_id": "enc-002", "paciente_id": "usr-001", "medico_id": "usr-003", "ts": datetime(2025, 10, 15, 11, 0), "especialidad": "cardiología"},
@@ -80,16 +126,12 @@ try:
     client.admin.command('ping')
     print("¡Conexión a Mongo exitosa!")
     
-    # --- ¡LÓGICA DE LIMPIEZA ACTUALIZADA! ---
-    # NO borramos usuarios. Limpiamos las colecciones de datos de EJEMPLO.
+    # Limpiamos las colecciones de datos de EJEMPLO.
     db.visitas_medicas.delete_many({})
-    db.habitos.drop() # Se dropea para recrearla como TimeSeries
+    db.habitos.drop() 
     db.turnos.delete_many({})
     print("Contenido de colecciones (visitas, habitos, turnos) limpiado.")
 
-    # --- ¡LÓGICA DE USUARIOS ACTUALIZADA! ---
-    # Carga Idempotente: Actualiza los usuarios base si existen, o los crea si no.
-    # NO borra a los usuarios registrados por la web.
     print("Actualizando usuarios base (Juan, Maria, Ana, Admin)...")
     user_ops = [
         ReplaceOne({"_id": user["_id"]}, user, upsert=True) for user in USUARIOS
@@ -98,11 +140,9 @@ try:
         db.usuarios.bulk_write(user_ops)
         print(f"{len(user_ops)} usuarios base actualizados/creados.")
     
-    # Insertar datos de ejemplo (estos sí se borran y recargan)
     db.visitas_medicas.insert_many(VISITAS_MEDICAS)
     db.turnos.insert_many(TURNOS)
     
-    # Crear Colección Time Series (Req 2)
     try:
         db.create_collection("habitos", 
             timeseries={"timeField": "ts", "metaField": "paciente_id", "granularity": "hours"}

@@ -6,9 +6,8 @@
     <title>Portal Paciente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        #dashboard-screen { display: none; }
+        #dashboard-screen, #confirmation-modal { display: none; }
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .login-tab.active { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; }
@@ -41,21 +40,32 @@
             <div id="register-pane" class="hidden">
                 <form id="register-form">
                     <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Crear Cuenta Paciente</h2>
-                    <div class="space-y-4">
-                        <input id="username-reg" type="text" placeholder="Nombre de Usuario" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="password-reg" type="password" placeholder="Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                        <input id="username-reg" type="text" placeholder="* Nombre de Usuario" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="password-reg" type="password" placeholder="* Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
                         <hr>
-                        <input id="nombre-reg" type="text" placeholder="Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="dni-reg" type="text" placeholder="DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="email-reg" type="email" placeholder="Email" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="nombre-reg" type="text" placeholder="* Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="dni-reg" type="text" placeholder="* DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="email-reg" type="email" placeholder="* Email" class="shadow-sm border rounded w-full py-2 px-3" required>
                         <div>
-                            <label class="text-sm text-gray-500">Fecha de Nacimiento</label>
+                            <label class="text-sm text-gray-500">* Fecha de Nacimiento</label>
                             <input id="fecha-nac-reg" type="date" class="shadow-sm border rounded w-full py-2 px-3" required>
                         </div>
+                        <input id="telefono-reg" type="tel" placeholder="Teléfono (ej: +54...)" class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="direccion-reg" type="text" placeholder="Dirección" class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="pais-reg" type="text" placeholder="País (ej: AR)" class="shadow-sm border rounded w-full py-2 px-3">
+                        <select id="genero-reg" class="shadow-sm border rounded w-full py-2 px-3 text-gray-500">
+                            <option value="">Seleccionar Género (Opcional)</option>
+                            <option value="M">Masculino</option>
+                            <option value="F">Femenino</option>
+                            <option value="O">Otro</option>
+                        </select>
+                        <hr>
                         <input id="os-reg" type="text" placeholder="Obra Social (Opcional)" class="shadow-sm border rounded w-full py-2 px-3">
-                        <div id="register-status" class="text-sm mb-4 hidden"></div>
-                        <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full">Crear Cuenta</button>
+                        <input id="afiliado-reg" type="text" placeholder="N° de Afiliado (Opcional)" class="shadow-sm border rounded w-full py-2 px-3">
                     </div>
+                    <div id="register-status" class="text-sm my-4 hidden"></div>
+                    <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full mt-4">Crear Cuenta</button>
                 </form>
             </div>
         </div>
@@ -71,7 +81,6 @@
         </header>
         <main class="flex-1 flex flex-col p-6 overflow-hidden">
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
-                
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
                     <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-700 text-blue-800"><i data-lucide="user" class="w-4 h-4"></i><span>Mi Perfil</span></button>
                     <button data-tab="registrar" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="edit" class="w-4 h-4"></i><span>Registrar Hábito</span></button>
@@ -79,10 +88,8 @@
                     <button data-tab="turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
                     <button data-tab="mis-turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clock" class="w-4 h-4"></i><span>Mis Turnos</span></button>
                 </nav>
-
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
-
                 <div id="tab-content">
                     <div id="perfil-content" class="tab-pane"></div>
                     <div id="registrar-content" class="tab-pane hidden"></div>
@@ -94,10 +101,33 @@
         </main>
     </div>
 
+    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <div class="flex flex-col items-center text-center">
+                    <div class="bg-orange-100 p-3 rounded-full">
+                        <i data-lucide="alert-triangle" class="w-8 h-8 text-orange-500"></i>
+                    </div>
+                    <h3 id="modal-title" class="text-2xl font-semibold text-gray-800 mt-4"></h3>
+                    <p id="modal-message" class="text-gray-600 mt-2"></p>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-8">
+                    <button id="modal-btn-cancel" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
+                        Cancelar
+                    </button>
+                    <button id="modal-btn-confirm" class="py-2 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                        Sí, Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'http://localhost:8000';
         let currentToken = null;
         let currentUser = null; 
+        let currentPacientePerfil = null; // <-- (¡NUEVO!) Caché para guardar el perfil
 
         // --- Selectores ---
         const loginScreen = document.getElementById('login-screen');
@@ -116,14 +146,37 @@
         const registerPane = document.getElementById('register-pane');
         const registerForm = document.getElementById('register-form');
         const registerStatus = document.getElementById('register-status');
+        const modal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalBtnConfirm = document.getElementById('modal-btn-confirm');
+        const modalBtnCancel = document.getElementById('modal-btn-cancel');
+        let modalConfirmCallback = null;
+
+        // --- Lógica del Modal ---
+        function showConfirmationModal(title, message, onConfirmCallback) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalConfirmCallback = onConfirmCallback; 
+            modal.style.display = 'flex';
+            lucide.createIcons();
+        }
+        function hideModal() {
+            modal.style.display = 'none';
+            modalConfirmCallback = null;
+        }
+        modalBtnCancel.addEventListener('click', hideModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+        modalBtnConfirm.addEventListener('click', () => {
+            if (modalConfirmCallback) modalConfirmCallback();
+            hideModal();
+        });
 
         // --- Helper de API ---
-        const fetchApi = async (url) => {
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${currentToken}` } });
-            if (!res.ok) { 
-                const err = await res.json(); 
-                throw new Error(err.detail || 'Error de API'); 
-            }
+        const fetchApi = async (url, options = {}) => {
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${currentToken}` };
+            const res = await fetch(url, options);
+            if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error de API'); }
             return res.json();
         };
 
@@ -134,7 +187,6 @@
             const formData = new URLSearchParams();
             formData.append('username', document.getElementById('username').value);
             formData.append('password', document.getElementById('password').value);
-
             try {
                 const res = await fetch(`${API_URL}/token`, {
                     method: 'POST',
@@ -142,30 +194,17 @@
                     body: formData,
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
                 const tokenData = await res.json();
                 currentToken = tokenData.access_token;
                 localStorage.setItem('vidasana_token', currentToken);
-                
                 currentUser = await fetchApi(`${API_URL}/usuarios/me`);
-
                 if (!currentUser.roles.includes("PACIENTE")) {
                     throw new Error("Acceso denegado. Este portal es solo para PACIENTES.");
                 }
-
                 await showDashboard();
-
             } catch (error) {
                 console.error("Error en el login:", error);
-                // Usar SweetAlert2 para mostrar el error de login
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de inicio de sesión',
-                    text: error.message,
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#dc2626' // Red 600
-                });
-                loginError.textContent = error.message; // Mantener para fallback o debugging si se desea
+                loginError.textContent = error.message;
                 loginError.classList.remove('hidden');
                 handleLogout();
             }
@@ -175,7 +214,6 @@
         async function handleRegister(e) {
             e.preventDefault();
             registerStatus.classList.add('hidden');
-            
             const body = {
                 username: document.getElementById('username-reg').value,
                 password: document.getElementById('password-reg').value,
@@ -183,11 +221,15 @@
                     nombre: document.getElementById('nombre-reg').value,
                     dni: document.getElementById('dni-reg').value,
                     email: document.getElementById('email-reg').value,
-                    fecha_nac: document.getElementById('fecha-nac-reg').value
+                    fecha_nac: document.getElementById('fecha-nac-reg').value,
+                    telefono: document.getElementById('telefono-reg').value || null,
+                    direccion: document.getElementById('direccion-reg').value || null,
+                    pais: document.getElementById('pais-reg').value || null,
+                    genero: document.getElementById('genero-reg').value || null
                 },
-                obra_social: document.getElementById('os-reg').value || null
+                obra_social: document.getElementById('os-reg').value || null,
+                numero_afiliado: document.getElementById('afiliado-reg').value || null
             };
-
             try {
                 const res = await fetch(`${API_URL}/register/paciente`, {
                     method: 'POST',
@@ -195,26 +237,13 @@
                     body: JSON.stringify(body)
                 });
                 if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Registro exitoso!',
-                    text: 'Tu cuenta ha sido creada. Ahora puedes iniciar sesión.',
-                    confirmButtonText: 'Ok',
-                    confirmButtonColor: '#22c55e' // Green 500
-                });
+                registerStatus.textContent = "¡Registro exitoso! Ahora puedes ingresar.";
+                registerStatus.className = 'text-sm mb-4 text-green-600';
+                registerStatus.classList.remove('hidden');
                 registerForm.reset();
                 switchLoginTabs('login');
-
             } catch (error) {
                 console.error("Error en el registro:", error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de registro',
-                    text: error.message,
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#dc2626' // Red 600
-                });
                 registerStatus.textContent = error.message;
                 registerStatus.className = 'text-sm mb-4 text-red-600';
                 registerStatus.classList.remove('hidden');
@@ -239,16 +268,15 @@
         async function fetchDataForTab(tabName) {
             if (!currentUser) return;
             const pacienteId = currentUser._id;
-            
             const contentDiv = document.getElementById(`${tabName}-content`);
             contentDiv.innerHTML = ''; 
             loadingSpinner.classList.remove('hidden');
             contentError.classList.add('hidden');
-            
             try {
                 if (tabName === 'perfil') {
-                    const perfil = await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`);
-                    renderPerfil(perfil);
+                    // (¡ACTUALIZADO!) Guardar en caché el perfil
+                    currentPacientePerfil = await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`);
+                    renderPerfil(currentPacientePerfil, false); // Renderizar en modo vista
                 } else if (tabName === 'registrar') {
                     renderFormHabito();
                 } else if (tabName === 'habitos') {
@@ -260,7 +288,6 @@
                     const turnos = await fetchApi(`${API_URL}/paciente/${pacienteId}/turnos`);
                     renderMisTurnos(turnos);
                 }
-
             } catch (err) {
                 console.error("Error fetching data:", err);
                 contentError.textContent = `Error: ${err.message}`;
@@ -271,307 +298,246 @@
             }
         }
         
-        // --- Funciones de Renderizado ---
-        
-        function renderPerfil(perfil) {
+        // --- (¡ACTUALIZADO!) Render Perfil (con modo Edición) ---
+        function renderPerfil(perfil, isEditing = false) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
-            document.getElementById('perfil-content').innerHTML = `
-                <h3 class="text-xl font-semibold text-gray-800">Mi Perfil</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${pii.nombre || 'N/A'}</p></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${pii.dni || 'N/A'}</p></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold">${p.obra_social || 'N/A'}</p></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${p.clinico?.alergias?.join(', ') || 'Ninguna'}</p></div>
-                </div>
-            `;
-        }
+            const clinico = p.clinico || {};
+            
+            let html = '';
 
-        function renderFormHabito() {
+            if (isEditing) {
+                // --- MODO EDICIÓN ---
+                const na = (val) => val || ''; // Para inputs, usar string vacío
+                html = `
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Editar Mi Perfil</h3>
+                    </div>
+                    <div id="perfil-save-status" class="text-sm my-2"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="md:col-span-2"><label class="text-sm font-medium text-gray-500">Dirección</label><input id="perfil-direccion" value="${na(pii.direccion)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                        <div><label class="text-sm font-medium text-gray-500">Teléfono</label><input id="perfil-telefono" value="${na(pii.telefono)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                        <div><label class="text-sm font-medium text-gray-500">País (ej: AR)</label><input id="perfil-pais" value="${na(pii.pais)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                        
+                        <div><label class="text-sm font-medium text-gray-500">Obra Social</label><input id="perfil-os" value="${na(p.obra_social)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                        <div><label class="text-sm font-medium text-gray-500">N° de Afiliado</label><input id="perfil-afiliado" value="${na(p.numero_afiliado)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+
+                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="font-semibold">${pii.nombre || 'N/A'}</p></div>
+                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="font-semibold">${pii.dni || 'N/A'}</p></div>
+                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="font-semibold">${pii.email || 'N/A'}</p></div>
+                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="font-semibold">${clinico.grupo_sanguineo || 'N/A'}</p></div>
+                    </div>
+                    <div class="flex space-x-4 mt-6">
+                        <button id="btn-save-perfil" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Guardar Cambios</button>
+                        <button id="btn-cancel-perfil" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">Cancelar</button>
+                    </div>
+                `;
+            } else {
+                // --- MODO VISTA ---
+                const naView = (val) => val || '<span class="text-gray-400">N/A</span>';
+                html = `
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Mi Perfil</h3>
+                        <button id="btn-edit-perfil" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded flex items-center space-x-2">
+                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                            <span>Editar Perfil</span>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${naView(pii.nombre)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${naView(pii.dni)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="text-lg font-semibold">${naView(pii.email)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Teléfono</h4><p class="text-lg font-semibold">${naView(pii.telefono)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border md:col-span-2"><h4 class="text-sm font-medium text-gray-500">Dirección</h4><p class="text-lg font-semibold">${naView(pii.direccion)} (${naView(pii.pais)})</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold">${naView(p.obra_social)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">N° de Afiliado</h4><p class="text-lg font-semibold">${naView(p.numero_afiliado)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="text-lg font-semibold">${naView(clinico.grupo_sanguineo)}</p></div>
+                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${clinico.alergias?.join(', ') || naView(null)}</p></div>
+                    </div>
+                `;
+            }
+            document.getElementById('perfil-content').innerHTML = html;
+            
+            // Re-adjuntar listeners
+            if (isEditing) {
+                document.getElementById('btn-save-perfil').addEventListener('click', handleSavePerfil);
+                document.getElementById('btn-cancel-perfil').addEventListener('click', () => renderPerfil(currentPacientePerfil, false));
+            } else {
+                document.getElementById('btn-edit-perfil').addEventListener('click', () => renderPerfil(currentPacientePerfil, true));
+                lucide.createIcons();
+            }
+        }
+        function renderFormHabito() { /* (Sin cambios) */
             document.getElementById('registrar-content').innerHTML = `
                 <h3 class="text-xl font-semibold text-gray-800">Registrar Hábito o Síntoma</h3>
                 <form id="form-habito" class="mt-4 space-y-4 max-w-lg">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Tipo de Registro</label>
-                        <select id="habito-tipo" class="mt-1 block w-full p-2 border rounded-md">
-                            <option value="glucosa">Glucosa (mg/dL)</option>
-                            <option value="presion_sistolica">Presión Sistólica (mmHg)</option>
-                            <option value="sueño">Horas de Sueño</option>
-                            <option value="sintoma">Sintoma (Alerta)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Valor o Descripción</label>
-                        <input id="habito-valor" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 110 o 'Dolor de cabeza'">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Notas (Opcional)</label>
-                        <input id="habito-notas" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 'en ayunas'">
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700">Tipo de Registro</label><select id="habito-tipo" class="mt-1 block w-full p-2 border rounded-md"><option value="glucosa">Glucosa (mg/dL)</option><option value="presion_sistolica">Presión Sistólica (mmHg)</option><option value="sueño">Horas de Sueño</option><option value="sintoma">Sintoma (Alerta)</option></select></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Valor o Descripción</label><input id="habito-valor" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 110 o 'Dolor de cabeza'"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Notas (Opcional)</label><input id="habito-notas" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: 'en ayunas'"></div>
                     <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded">Registrar</button>
                     <div id="habito-status" class="text-sm mt-2"></div>
                 </form>
             `;
             document.getElementById('form-habito').addEventListener('submit', handleRegistrarHabito);
         }
-
-        function renderHabitos(habitos) {
+        function renderHabitos(habitos) { /* (Sin cambios) */
              let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Hábitos Registrados</h3>';
-            if (habitos.length === 0) {
-                html += '<p class="mt-4">Aún no has registrado hábitos.</p>';
-            } else {
-                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
-                        <thead class="bg-gray-50"><tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
-                        </tr></thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${habitos.map(h => `
-                                <tr>
-                                    <td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td>
-                                    <td class="px-6 py-4">${h.tipo}</td>
-                                    <td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody></table>`;
+            if (habitos.length === 0) { html += '<p class="mt-4">Aún no has registrado hábitos.</p>'; } else {
+                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${habitos.map(h => `<tr><td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td><td class="px-6 py-4">${h.tipo}</td><td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td></tr>`).join('')}</tbody></table>`;
             }
             document.getElementById('habitos-content').innerHTML = html;
         }
-
-        function renderFormTurno() {
+        function renderFormTurno() { /* (Sin cambios) */
             document.getElementById('turnos-content').innerHTML = `
                 <h3 class="text-xl font-semibold text-gray-800">Solicitar Turno</h3>
                 <form id="form-turno" class="mt-4 space-y-4 max-w-lg">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Médico (ID)</label>
-                        <select id="turno-medico" class="mt-1 block w-full p-2 border rounded-md">
-                            <option value="usr-003">Dra. Ana Gomez (Cardiología)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Fecha y Hora</label>
-                        <input id="turno-ts" type="datetime-local" class="mt-1 block w-full p-2 border rounded-md">
-                    </div>
-                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Sede</label>
-                        <select id="turno-sede" class="mt-1 block w-full p-2 border rounded-md">
-                            <option value="Argentina">Argentina</option>
-                            <option value="Colombia">Colombia</option>
-                            <option value="Uruguay">Uruguay</option>
-                        </select>
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700">Médico (ID)</label><select id="turno-medico" class="mt-1 block w-full p-2 border rounded-md"><option value="usr-003">Dra. Ana Gomez (Cardiología)</option></select></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Fecha y Hora</label><input id="turno-ts" type="datetime-local" class="mt-1 block w-full p-2 border rounded-md"></div>
+                     <div><label class="block text-sm font-medium text-gray-700">Sede</label><select id="turno-sede" class="mt-1 block w-full p-2 border rounded-md"><option value="Argentina">Argentina</option><option value="Colombia">Colombia</option><option value="Uruguay">Uruguay</option></select></div>
                     <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded">Solicitar Turno</button>
                     <div id="turno-status" class="text-sm mt-2"></div>
                 </form>
             `;
             document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
         }
-
-        function renderMisTurnos(turnos) {
+        function renderMisTurnos(turnos) { /* (Sin cambios) */
             let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Turnos</h3>';
-            if (turnos.length === 0) {
-                html += '<p class="mt-4">No tienes turnos registrados.</p>';
-            } else {
-                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg">
-                        <thead class="bg-gray-50"><tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                        </tr></thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${turnos.map(t => {
-                                const estadoClase = t.estado === 'pendiente' ? 'text-blue-600' : 'text-gray-500';
-                                return `
-                                <tr>
-                                    <td class="px-6 py-4">${new Date(t.ts.$date).toLocaleString()}</td>
-                                    <td class="px-6 py-4">${t.medico_nombre || 'N/A'}</td>
-                                    <td class="px-6 py-4">${t.especialidad}</td>
-                                    <td class="px-6 py-4 font-semibold ${estadoClase}">${t.estado}</td>
-                                </tr>
-                            `}).join('')}
-                        </tbody></table>`;
+            if (turnos.length === 0) { html += '<p class="mt-4">No tienes turnos registrados.</p>'; } else {
+                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { const estadoClase = t.estado === 'pendiente' ? 'text-blue-600' : 'text-gray-500'; return `<tr><td class="px-6 py-4">${new Date(t.ts.$date).toLocaleString()}</td><td class="px-6 py-4">${t.medico_nombre || 'N/A'}</td><td class="px-6 py-4">${t.especialidad}</td><td class="px-6 py-4 font-semibold ${estadoClase}">${t.estado}</td></tr>`}).join('')}</tbody></table>`;
             }
             document.getElementById('mis-turnos-content').innerHTML = html;
         }
 
+        // --- (¡NUEVO!) Handler para Guardar Perfil ---
+        async function handleSavePerfil() {
+            const statusDiv = document.getElementById('perfil-save-status');
+            
+            // 1. Recolectar datos del formulario de edición
+            const body = {
+                telefono: document.getElementById('perfil-telefono').value || null,
+                direccion: document.getElementById('perfil-direccion').value || null,
+                pais: document.getElementById('perfil-pais').value || null,
+                obra_social: document.getElementById('perfil-os').value || null,
+                numero_afiliado: document.getElementById('perfil-afiliado').value || null
+            };
 
-        // --- Handlers (¡ACTUALIZADOS CON SweetAlert2!) ---
+            showConfirmationModal(
+                "¿Guardar Cambios?",
+                "¿Estás seguro de que deseas actualizar tu perfil con esta información?",
+                async () => { // onConfirm
+                    statusDiv.textContent = 'Guardando...';
+                    statusDiv.className = 'text-sm my-2 text-gray-500';
+                    try {
+                        await fetchApi(`${API_URL}/paciente/${currentUser._id}/perfil`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        
+                        // ¡Éxito! Refrescar la pestaña de perfil
+                        await fetchDataForTab('perfil'); 
+
+                    } catch (error) {
+                        statusDiv.textContent = `Error: ${error.message}`;
+                        statusDiv.className = 'text-sm my-2 text-red-600';
+                    }
+                }
+            );
+        }
+
+        // --- Handlers (con modal) ---
         async function handleRegistrarHabito(e) {
             e.preventDefault();
-            
-            // --- ¡NUEVO! Confirmación con SweetAlert2 ---
-            const result = await Swal.fire({
-                title: '¿Estás seguro?',
-                text: "¿Deseas registrar este hábito?",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#1d4ed8', // Blue 700
-                cancelButtonColor: '#ef4444',   // Red 500
-                confirmButtonText: 'Sí, registrar',
-                cancelButtonText: 'Cancelar'
-            });
-
-            if (!result.isConfirmed) {
-                return; // Detener si el usuario cancela
-            }
-            // --- Fin ---
-
-            const statusDiv = document.getElementById('habito-status');
             const tipo = document.getElementById('habito-tipo').value;
             const valor = document.getElementById('habito-valor').value;
-            const notas = document.getElementById('habito-notas').value;
-
-            let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
-            if (isNaN(valorParseado) && tipo !== 'sintoma') {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de entrada',
-                    text: 'El valor debe ser numérico para este tipo de hábito.',
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#dc2626'
-                });
-                return;
-            }
-
-            statusDiv.textContent = 'Registrando...';
-            try {
-                const res = await fetch(`${API_URL}/habitos`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ "tipo": tipo, "valor": valorParseado, "notas": notas || null })
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Registrado!',
-                    text: `El hábito '${tipo}' ha sido registrado con éxito.`,
-                    confirmButtonText: 'Ok',
-                    confirmButtonColor: '#22c55e'
-                });
-                e.target.reset(); 
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al registrar',
-                    text: `Error: ${error.message}`,
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#dc2626'
-                });
-            } finally {
-                statusDiv.textContent = ''; // Limpiar el estado interno
-            }
+            showConfirmationModal(
+                "¿Registrar Hábito?",
+                `¿Estás seguro de que deseas registrar "${tipo}: ${valor}"?`,
+                async () => { // onConfirm
+                    const statusDiv = document.getElementById('habito-status');
+                    const notas = document.getElementById('habito-notas').value;
+                    let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
+                    if (isNaN(valorParseado) && tipo !== 'sintoma') {
+                         statusDiv.textContent = 'El valor debe ser numérico.';
+                         statusDiv.className = 'text-sm mt-2 text-red-600';
+                         return;
+                    }
+                    statusDiv.textContent = 'Registrando...';
+                    try {
+                        await fetchApi(`${API_URL}/habitos`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ "tipo": tipo, "valor": valorParseado, "notas": notas || null })
+                        });
+                        statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
+                        statusDiv.className = 'text-sm mt-2 text-green-600';
+                        e.target.reset(); 
+                    } catch (error) {
+                        statusDiv.textContent = `Error: ${error.message}`;
+                        statusDiv.className = 'text-sm mt-2 text-red-600';
+                    }
+                }
+            );
         }
 
         async function handleSacarTurno(e) {
             e.preventDefault();
-
-            // --- ¡NUEVO! Confirmación con SweetAlert2 ---
-            const result = await Swal.fire({
-                title: '¿Confirmar turno?',
-                text: "¿Estás seguro de que deseas solicitar este turno?",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#1d4ed8', // Blue 700
-                cancelButtonColor: '#ef4444',   // Red 500
-                confirmButtonText: 'Sí, solicitar',
-                cancelButtonText: 'Cancelar'
-            });
-
-            if (!result.isConfirmed) {
-                return; // Detener si el usuario cancela
-            }
-            // --- Fin ---
-
-            const statusDiv = document.getElementById('turno-status');
-            const medico_id = document.getElementById('turno-medico').value;
             const ts = document.getElementById('turno-ts').value;
-            const sede = document.getElementById('turno-sede').value;
-
+            const statusDiv = document.getElementById('turno-status');
             if (!ts) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Campo requerido',
-                    text: 'Debe seleccionar una fecha y hora para el turno.',
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#fbbf24' // Yellow 400
-                });
+                statusDiv.textContent = 'Debe seleccionar una fecha y hora.';
+                statusDiv.className = 'text-sm mt-2 text-red-600';
                 return;
             }
             if (new Date(ts) < new Date()) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Fecha inválida',
-                    text: 'La fecha y hora del turno no pueden ser anteriores a la actual.',
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#fbbf24'
-                });
+                statusDiv.textContent = 'La fecha y hora del turno no pueden ser anteriores a la actual.';
+                statusDiv.className = 'text-sm mt-2 text-red-600';
                 return;
             }
-
-            statusDiv.textContent = 'Solicitando...';
-            try {
-                const turno_id = "turno-" + Date.now();
-                const medico_data = document.getElementById('turno-medico').options[0].text; 
-                const especialidad = medico_data.split('(')[1].replace(')',''); 
-
-                const res = await fetch(`${API_URL}/turnos`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        "_id": turno_id,
-                        "paciente_id": currentUser._id, 
-                        "medico_id": medico_id,
-                        "ts": new Date(ts).toISOString(),
-                        "especialidad": especialidad,
-                        "sede": sede
-                    })
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Turno solicitado!',
-                    text: `Tu turno para ${especialidad} ha sido solicitado con éxito.`,
-                    confirmButtonText: 'Ok',
-                    confirmButtonColor: '#22c55e'
-                });
-                e.target.reset();
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al solicitar turno',
-                    text: `Error: ${error.message}`,
-                    confirmButtonText: 'Entendido',
-                    confirmButtonColor: '#dc2626'
-                });
-            } finally {
-                statusDiv.textContent = ''; // Limpiar el estado interno
-            }
+            showConfirmationModal(
+                "¿Solicitar Turno?",
+                `¿Estás seguro de que deseas solicitar este turno para el ${new Date(ts).toLocaleString()}?`,
+                async () => { // onConfirm
+                    const medico_id = document.getElementById('turno-medico').value;
+                    const sede = document.getElementById('turno-sede').value;
+                    statusDiv.textContent = 'Solicitando...';
+                    try {
+                        const turno_id = "turno-" + Date.now();
+                        const medico_data = document.getElementById('turno-medico').options[0].text; 
+                        const especialidad = medico_data.split('(')[1].replace(')',''); 
+                        await fetchApi(`${API_URL}/turnos`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                "_id": turno_id,
+                                "paciente_id": currentUser._id, 
+                                "medico_id": medico_id,
+                                "ts": new Date(ts).toISOString(),
+                                "especialidad": especialidad,
+                                "sede": sede
+                            })
+                        });
+                        statusDiv.textContent = `¡Turno solicitado con éxito para ${especialidad}!`;
+                        statusDiv.className = 'text-sm mt-2 text-green-600';
+                        e.target.reset();
+                    } catch (error) {
+                        statusDiv.textContent = `Error: ${error.message}`;
+                        statusDiv.className = 'text-sm mt-2 text-red-600';
+                    }
+                }
+            );
         }
 
-        // --- Event Listeners (¡ACTUALIZADO!) ---
+        // --- Event Listeners ---
         loginForm.addEventListener('submit', handleLogin);
         registerForm.addEventListener('submit', handleRegister);
         
-        // --- ¡NUEVO! Confirmación de Logout con SweetAlert2 ---
-        logoutButton.addEventListener('click', async () => {
-            const result = await Swal.fire({
-                title: '¿Cerrar sesión?',
-                text: "¿Estás seguro de que deseas cerrar tu sesión actual?",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc2626', // Red 600
-                cancelButtonColor: '#6b7280',   // Gray 500
-                confirmButtonText: 'Sí, cerrar sesión',
-                cancelButtonText: 'Cancelar'
-            });
-
-            if (result.isConfirmed) {
-                handleLogout();
-            }
+        logoutButton.addEventListener('click', () => {
+            showConfirmationModal(
+                "¿Cerrar sesión?",
+                "¿Estás seguro de que deseas cerrar tu sesión actual?",
+                handleLogout 
+            );
         });
 
         function switchLoginTabs(targetTab) {

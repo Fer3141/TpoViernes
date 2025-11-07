@@ -7,13 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Ocultar Vistas */
         #dashboard-medico-screen, #dashboard-admin-screen, #confirmation-modal { display: none; }
-        
         #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Estilos Pestañas Login */
         .login-tab.active { border-bottom: 2px solid #0284c7; color: #0284c7; }
         .login-tab { border-bottom: 2px solid transparent; }
     </style>
@@ -71,12 +67,14 @@
             </div>
         </header>
 
-        <main class="flex-1 flex flex-col p-6 overflow-hidden"> <div class="mb-4">
+        <main class="flex-1 flex flex-col p-6 overflow-hidden">
+            <div class="mb-4">
                 <label for="paciente-select" class="block text-sm font-medium text-gray-700 mb-1">Seleccionar Paciente</label>
                 <select id="paciente-select" class="w-full max-w-xs p-2 border rounded-md shadow-sm"></select>
             </div>
             
-            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg"> <nav class="flex space-x-2 mb-6 border-b border-gray-200">
+            <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
+                <nav class="flex space-x-2 mb-6 border-b border-gray-200">
                     <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-500 text-blue-600"><i data-lucide="user" class="w-4 h-4"></i><span>Perfil</span></button>
                     <button data-tab="visitas" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clipboard" class="w-4 h-4"></i><span>Visitas</span></button>
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Hábitos</span></button>
@@ -104,22 +102,35 @@
         </header>
 
         <main class="flex-1 flex flex-col p-6 overflow-auto">
-            <div class="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto w-full"> <h2 class="text-2xl font-bold text-gray-800 mb-6">Crear Nuevo Médico</h2>
+            <div class="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto w-full">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Crear Nuevo Médico</h2>
                 <form id="create-medico-form" class="space-y-4">
                     <h3 class="text-lg font-semibold border-b pb-2">Datos de Acceso</h3>
-                    <input id="medico-username" type="text" placeholder="Nombre de Usuario (ej: rlopez)" class="shadow-sm border rounded w-full py-2 px-3" required>
-                    <input id="medico-password" type="password" placeholder="Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-username" type="text" placeholder="* Nombre de Usuario (ej: rlopez)" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-password" type="password" placeholder="* Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    
                     <h3 class="text-lg font-semibold border-b pb-2 pt-4">Información Personal (PII)</h3>
-                    <input id="medico-nombre" type="text" placeholder="Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
-                    <input id="medico-dni" type="text" placeholder="DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
-                    <input id="medico-email" type="email" placeholder="Email" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-nombre" type="text" placeholder="* Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-dni" type="text" placeholder="* DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-email" type="email" placeholder="* Email" class="shadow-sm border rounded w-full py-2 px-3" required>
                     <div>
-                        <label class="text-sm text-gray-500">Fecha de Nacimiento</label>
+                        <label class="text-sm text-gray-500">* Fecha de Nacimiento</label>
                         <input id="medico-fecha-nac" type="date" class="shadow-sm border rounded w-full py-2 px-3" required>
                     </div>
+                    <input id="medico-telefono" type="tel" placeholder="Teléfono (ej: +54...)" class="shadow-sm border rounded w-full py-2 px-3">
+                    <input id="medico-direccion" type="text" placeholder="Dirección" class="shadow-sm border rounded w-full py-2 px-3">
+                    <input id="medico-pais" type="text" placeholder="País (ej: AR)" class="shadow-sm border rounded w-full py-2 px-3">
+                    <select id="medico-genero" class="shadow-sm border rounded w-full py-2 px-3 text-gray-500">
+                        <option value="">Seleccionar Género (Opcional)</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                        <option value="O">Otro</option>
+                    </select>
+
                     <h3 class="text-lg font-semibold border-b pb-2 pt-4">Perfil Profesional</h3>
-                    <input id="medico-matricula" type="text" placeholder="Matrícula" class="shadow-sm border rounded w-full py-2 px-3" required>
-                    <input id="medico-especialidad" type="text" placeholder="Especialidad (ej: cardiología)" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-matricula" type="text" placeholder="* Matrícula" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    <input id="medico-especialidad" type="text" placeholder="* Especialidad (ej: cardiología)" class="shadow-sm border rounded w-full py-2 px-3" required>
+                    
                     <div id="create-medico-status" class="text-sm mb-4 hidden"></div>
                     <button type="submit" class="bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded w-full">Crear Médico</button>
                 </form>
@@ -320,24 +331,34 @@
             }
         }
         
-        // --- Funciones de Renderizado (Médico) ---
+        // --- (¡ACTUALIZADO!) Render Perfil (Médico) ---
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
+            const clinico = p.clinico || {};
+            const na = (val) => val || '<span class="text-gray-400">N/A</span>';
+
             document.getElementById('perfil-content').innerHTML = `
                 <h3 class="text-xl font-semibold text-gray-800">Perfil del Paciente</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${pii.nombre || 'N/A'}</p></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${pii.dni || 'N/A'}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${na(pii.nombre)}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${na(pii.dni)}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="text-lg font-semibold">${na(pii.email)}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Teléfono</h4><p class="text-lg font-semibold">${na(pii.telefono)}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border md:col-span-2"><h4 class="text-sm font-medium text-gray-500">Dirección</h4><p class="text-lg font-semibold">${na(pii.direccion)} (${na(pii.pais)})</p></div>
+                    
                     <div class="bg-gray-50 p-4 rounded-lg border col-span-1 md:col-span-2">
-                        <h4 class="text-sm font-medium text-gray-500">Obra Social</h4>
+                        <h4 class="text-sm font-medium text-gray-500">Obra Social / N° Afiliado</h4>
                         <div class="flex items-center space-x-2 mt-2">
-                            <input id="input-obra-social" type="text" value="${p.obra_social || ''}" class="shadow-sm border rounded w-full py-2 px-3">
+                            <input id="input-obra-social" type="text" value="${p.obra_social || ''}" class="shadow-sm border rounded w-full py-2 px-3" placeholder="Obra Social">
+                            <input id="input-afiliado" type="text" value="${p.numero_afiliado || ''}" class="shadow-sm border rounded w-full py-2 px-3" placeholder="N° Afiliado">
                             <button id="btn-guardar-os" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Guardar</button>
                         </div>
                         <div id="os-save-status" class="text-sm mt-2"></div>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${p.clinico?.alergias?.join(', ') || 'Ninguna'}</p></div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="text-lg font-semibold">${na(clinico.grupo_sanguineo)}</p></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${clinico.alergias?.join(', ') || na(null)}</p></div>
                 </div>
             `;
             document.getElementById('btn-guardar-os').addEventListener('click', () => handleGuardarOS(perfil._id));
@@ -374,21 +395,26 @@
             document.getElementById('btn-asignar-riesgo').addEventListener('click', () => handleAsignarRiesgo(red.pacienteId));
         }
         
-        // --- Handlers (Médico - ¡ACTUALIZADOS CON MODAL!) ---
+        // --- (¡ACTUALIZADO!) Handlers (Médico) ---
         
         async function handleGuardarOS(pacienteId) {
             const statusDiv = document.getElementById('os-save-status');
-            const input = document.getElementById('input-obra-social');
+            const os = document.getElementById('input-obra-social').value;
+            const afiliado = document.getElementById('input-afiliado').value;
+            
             showConfirmationModal(
                 "¿Guardar Cambios?",
-                `¿Estás seguro de que deseas actualizar la obra social a "${input.value}"?`,
+                `¿Estás seguro de que deseas guardar estos datos?`,
                 async () => { 
                     statusDiv.textContent = 'Guardando...';
                     try {
                         await fetchApi(`${API_URL}/paciente/${pacienteId}/perfil`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ "obra_social": input.value })
+                            body: JSON.stringify({ 
+                                "obra_social": os,
+                                "numero_afiliado": afiliado
+                            })
                         });
                         statusDiv.textContent = '¡Guardado con éxito!';
                         statusDiv.className = 'text-sm mt-2 text-green-600';
@@ -455,24 +481,28 @@
             );
         }
 
-        // --- Handler (Admin) ---
+        // --- (¡ACTUALIZADO!) Handler (Admin) ---
         async function handleCrearMedico(e) {
             e.preventDefault();
             createMedicoStatus.classList.add('hidden');
+            const nombreMedico = document.getElementById('medico-nombre').value;
             
-            // ¡NUEVO! Confirmación para el Admin
             showConfirmationModal(
                 "¿Crear Médico?",
-                `¿Estás seguro de que deseas crear al médico ${document.getElementById('medico-nombre').value}?`,
-                async () => { // onConfirm
+                `¿Estás seguro de que deseas crear al médico ${nombreMedico}?`,
+                async () => { 
                     const body = {
                         username: document.getElementById('medico-username').value,
                         password: document.getElementById('medico-password').value,
                         pii: {
-                            nombre: document.getElementById('medico-nombre').value,
+                            nombre: nombreMedico,
                             dni: document.getElementById('medico-dni').value,
                             email: document.getElementById('medico-email').value,
-                            fecha_nac: document.getElementById('medico-fecha-nac').value
+                            fecha_nac: document.getElementById('medico-fecha-nac').value,
+                            telefono: document.getElementById('medico-telefono').value || null,
+                            direccion: document.getElementById('medico-direccion').value || null,
+                            pais: document.getElementById('medico-pais').value || null,
+                            genero: document.getElementById('medico-genero').value || null
                         },
                         perfil: {
                             perfil: {
