@@ -49,7 +49,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Modelos Pydantic (¡ACTUALIZADOS!) ---
+# --- Modelos Pydantic ---
 
 class Token(BaseModel):
     access_token: str
@@ -79,7 +79,6 @@ class TurnoInput(BaseModel):
 class TurnoUpdate(BaseModel):
     estado: str 
 
-# (¡ACTUALIZADO!) Modelo PII ahora más rico
 class PII(BaseModel):
     dni: str
     nombre: str
@@ -90,11 +89,10 @@ class PII(BaseModel):
     pais: Optional[str] = None
     genero: Optional[str] = None
 
-# (¡ACTUALIZADO!) Modelo PacienteData ahora más rico
 class PacienteData(BaseModel):
     obra_social: Optional[str] = None
-    numero_afiliado: Optional[str] = None # <-- ¡NUEVO!
-    clinico: Optional[dict] = None # (Ej: grupo_sanguineo, alergias)
+    numero_afiliado: Optional[str] = None 
+    clinico: Optional[dict] = None 
 
 class MedicoData(BaseModel):
     perfil: Optional[dict] = None
@@ -108,22 +106,15 @@ class UsuarioCreate(BaseModel):
     paciente: Optional[PacienteData] = None
     medico: Optional[MedicoData] = None
 
-# --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-# (¡ACTUALIZADO!) Modelo para que el Paciente actualice su perfil
 class PacienteUpdate(BaseModel):
-    # Campos PII (de pii.*)
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     pais: Optional[str] = None
     genero: Optional[str] = None
-    
-    # Campos Paciente (de paciente.*)
     obra_social: Optional[str] = None
     numero_afiliado: Optional[str] = None
     clinico: Optional[Dict[str, Any]] = None
-# --- Fin de la corrección ---
 
-# Modelo para Auto-Registro de Paciente
 class PacienteRegister(BaseModel):
     username: str
     password: str 
@@ -131,7 +122,6 @@ class PacienteRegister(BaseModel):
     obra_social: Optional[str] = None
     numero_afiliado: Optional[str] = None
 
-# Modelo para Creación de Médico (Admin)
 class MedicoCreate(BaseModel):
     username: str
     password: str 
@@ -149,6 +139,11 @@ class HabitoCreate(BaseModel):
     valor: float | str 
     notas: Optional[str] = None
 
+# [MODELO AÑADIDO] Input para registrar visita desde el dashboard del médico
+class VisitaRegistroInput(BaseModel):
+    turno_id: str
+    diagnosticos: List[str] = Field(default_factory=list)
+    notas: Optional[str] = None
 
 # --- Inicializar Clientes (Globales) ---
 mongo_client: AsyncIOMotorClient | None = None
@@ -329,7 +324,7 @@ async def admin_crear_medico(
         "_id": user_id,
         "auth": {"username": user_in.username, "password_hash": hashed_password},
         "roles": ["MEDICO"], 
-        "pii": user_in.pii.dict(exclude_none=True), 
+        "pii": user_in.pii.dict(exclude_none=True),
         "paciente": None,
         "medico": user_in.perfil.dict(exclude_none=True)
     }
@@ -359,21 +354,18 @@ async def read_users_me(current_user: UsuarioEnDB = Depends(get_current_user)):
 @app.patch("/paciente/{paciente_id}/perfil")
 async def actualizar_perfil_paciente(
     paciente_id: str, 
-    update_data: PacienteUpdate, # <-- ¡Este modelo ahora está corregido!
+    update_data: PacienteUpdate, 
     current_user: UsuarioEnDB = Depends(get_current_user)
 ):
     if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
     if "PACIENTE" in current_user.roles and current_user.id != paciente_id:
-        # (Permitir que médicos vean perfiles)
         if "MEDICO" not in current_user.roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
     update_fields = {}
-    # (¡ACTUALIZADO!) Pydantic ahora entrega todos los campos
     update_data_dict = update_data.dict(exclude_unset=True) 
     
     for key, value in update_data_dict.items():
-        # (Esta lógica ahora funciona porque 'telefono', 'direccion', etc. SÍ LLEGAN)
         if key in ["obra_social", "clinico", "numero_afiliado"]:
              update_fields[f"paciente.{key}"] = value
         elif key in ["telefono", "direccion", "pais", "genero"]: 
@@ -545,6 +537,104 @@ async def actualizar_estado_turno(
     await redis_client.publish(canal, mensaje)
     return {"status": f"turno actualizado a {update.estado}", "turno_id": turno_id}
 
+@app.patch("/turnos/{turno_id}/cancelar")
+async def cancelar_turno_paciente(
+    turno_id: str, 
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
+    """
+    Permite a un paciente cancelar su propio turno.
+    Actualiza el estado a 'CANCELADO' y envía un evento a Redis.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if redis_client is None: raise HTTPException(503, "Redis no conectado")
+    
+    # 1. Obtener el turno para verificar que pertenezca al usuario logueado
+    turno = await mongo_db.turnos.find_one({"_id": turno_id})
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+        
+    if turno.get("paciente_id") != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para cancelar este turno")
+        
+    if turno.get("estado").upper() != "PENDIENTE":
+        raise HTTPException(status_code=400, detail=f"El turno ya fue {turno.get('estado').upper()}")
+
+    # 2. Actualizar el estado en MongoDB
+    result = await mongo_db.turnos.update_one(
+        {"_id": turno_id}, 
+        {"$set": {"estado": "CANCELADO", "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Turno no encontrado o ya cancelado")
+
+    # 3. Notificar vía Redis (Sistema de Eventos - Req 4)
+    canal = "eventos_turnos"
+    mensaje = json.dumps({"evento": "TURNO_CANCELADO", "turno_id": turno_id, "paciente_id": current_user.id})
+    await redis_client.publish(canal, mensaje)
+    
+    return {"status": "turno cancelado exitosamente", "turno_id": turno_id}
+
+# [ENDPOINT AÑADIDO] Registrar visita y completar turno (para el botón del médico)
+@app.post("/visitas/registrar_y_completar_turno", status_code=status.HTTP_201_CREATED)
+async def registrar_visita_y_completar_turno(
+    data: VisitaRegistroInput,
+    current_user: UsuarioEnDB = Depends(get_current_user)
+):
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    if "MEDICO" not in current_user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo los médicos pueden registrar visitas")
+
+    # 1. Obtener detalles del turno y verificar pertenencia
+    turno = await mongo_db.turnos.find_one({"_id": data.turno_id})
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+    if turno.get("medico_id") != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para completar este turno")
+    if turno.get("estado").upper() != "PENDIENTE":
+        raise HTTPException(status_code=400, detail=f"El turno ya fue {turno.get('estado').upper()}")
+
+    # 2. Registrar visita médica
+    now = datetime.now(timezone.utc)
+    visita_id = f"enc-{data.turno_id}-{now.strftime('%Y%m%d%H%M%S')}"
+    
+    # [CAMBIO CLAVE AQUÍ] Usar .get() con un valor por defecto
+    especialidad_turno = turno.get("especialidad", "Especialidad no detallada") 
+    
+    visita_doc = {
+        "_id": visita_id,
+        "paciente_id": turno["paciente_id"],
+        "medico_id": turno["medico_id"],
+        "ts": now,
+        "especialidad": especialidad_turno, # <-- Usamos el valor asegurado
+        "diagnosticos": data.diagnosticos,
+        "notas": data.notas,
+        "version": 1 
+    }
+    
+    try:
+        await mongo_db.visitas_medicas.insert_one(visita_doc)
+        # Opcional: Actualizar la referencia en el documento del paciente
+        await mongo_db.usuarios.update_one(
+            {"_id": turno["paciente_id"]},
+            {"$set": {"paciente.resumen.ultima_visita_id": visita_id}}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al registrar la visita: {e}")
+    
+    # 3. Actualizar estado del turno a 'REALIZADO'
+    result = await mongo_db.turnos.update_one(
+        {"_id": data.turno_id}, 
+        {"$set": {"estado": "REALIZADO", "visita_id": visita_id, "updated_at": now}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=500, detail="Error de concurrencia al actualizar turno.")
+
+    return {"status": "visita registrada y turno completado", "visita_id": visita_id, "turno_id": data.turno_id}
+
+
 # ---
 # REQ 6 / REQ 3: Endpoints de Dashboard de Médico
 # ---
@@ -583,29 +673,21 @@ async def get_turnos_del_paciente(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     try:
         # --- LÓGICA DE ACTUALIZACIÓN DE TURNO (SIMPLE) ---
-        # Usamos UTC para la comparación, ya que es la zona horaria del sistema de FastAPI/MongoDB
         ahora_utc = datetime.now(timezone.utc)
-        
-        # Filtro: Turnos PENDIENTES cuya fecha (ts) es anterior a AHORA
         update_filter = {
             "paciente_id": paciente_id,
-            "estado": "pendiente", # <-- Usa minúsculas si así lo guardas
+            "estado": "pendiente", 
             "ts": {"$lt": ahora_utc} 
         }
-        
-        # Acción: Cambiar el estado
         update_set = {
             "$set": {"estado": "NO_ASISTIO", "updated_at": ahora_utc}
         }
-
-        # Ejecutar la actualización masiva (esto es eficiente)
         await mongo_db.turnos.update_many(
             update_filter, 
             update_set
         )
         # ---------------------------------------------------
         
-        # Consulta para devolver los turnos (ahora actualizados)
         pipeline = [
             {"$match": {"paciente_id": paciente_id}},
             {"$sort": {"ts": 1}},
@@ -623,6 +705,77 @@ async def get_turnos_del_paciente(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener/actualizar turnos: {e}")
+
+@app.get("/medico/{medico_id}/turnos_del_dia")
+async def get_turnos_del_dia(medico_id: str, current_user: UsuarioEnDB = Depends(get_current_user)):
+    """
+    Obtiene los turnos programados para el día de hoy del médico especificado.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+
+    if str(current_user.id) != medico_id and "ADMINISTRADOR" not in current_user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para ver estos turnos")
+    
+    now_utc = datetime.now(timezone.utc)
+    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    
+    pipeline = [
+        {"$match": {
+            "medico_id": medico_id,
+            "ts": {"$gte": today_start, "$lt": today_end}
+        }},
+        {"$sort": {"ts": 1}}, 
+        {"$lookup": {"from": "usuarios", "localField": "paciente_id", "foreignField": "_id", "as": "paciente_info"}},
+        {"$unwind": {"path": "$paciente_info", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "_id": 1, 
+            "ts": 1, 
+            "estado": 1, 
+            "especialidad": 1, 
+            "sede": 1,
+            "paciente_id": "$paciente_info._id",
+            "paciente_nombre": { "$ifNull": [ "$paciente_info.pii.nombre", "Paciente Eliminado" ] }
+        }}
+    ]
+    
+    try:
+        cursor = mongo_db.turnos.aggregate(pipeline)
+        turnos = await cursor.to_list(length=None)
+        return parse_json(turnos)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener turnos del día: {e}")
+
+@app.get("/medicos")
+async def get_all_medicos(current_user: UsuarioEnDB = Depends(get_current_user)):
+    """
+    Obtiene la lista de todos los médicos registrados.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+    
+    pipeline = [
+        {"$match": {"roles": "MEDICO"}},
+        {"$project": {
+            "_id": 1, 
+            "nombre": "$pii.nombre",
+            "especialidad": "$medico.perfil.especialidad" 
+        }}
+    ]
+    try:
+        cursor = mongo_db.usuarios.aggregate(pipeline)
+        medicos = await cursor.to_list(length=None)
+        
+        for medico in medicos:
+             especialidad = medico.get("especialidad")
+             if isinstance(especialidad, list):
+                 medico["especialidad"] = ", ".join(especialidad)
+             elif not especialidad:
+                 medico["especialidad"] = "General"
+
+        return parse_json(medicos)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
+    
 
 # ---
 # REQ 5: Evaluación de Riesgos
@@ -736,127 +889,6 @@ async def calcular_riesgo(
     )
     return riesgo_calculado
 
-@app.patch("/turnos/{turno_id}/cancelar")
-async def cancelar_turno_paciente(
-    turno_id: str, 
-    current_user: UsuarioEnDB = Depends(get_current_user)
-):
-    """
-    Permite a un paciente cancelar su propio turno.
-    Actualiza el estado a 'CANCELADO' y envía un evento a Redis.
-    """
-    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    if redis_client is None: raise HTTPException(503, "Redis no conectado")
-    
-    # 1. Obtener el turno para verificar que pertenezca al usuario logueado
-    turno = await mongo_db.turnos.find_one({"_id": turno_id})
-    if not turno:
-        raise HTTPException(status_code=404, detail="Turno no encontrado")
-        
-    if turno.get("paciente_id") != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para cancelar este turno")
-        
-    if turno.get("estado").upper() != "PENDIENTE":
-        raise HTTPException(status_code=400, detail=f"El turno ya fue {turno.get('estado').upper()}")
-
-    # 2. Actualizar el estado en MongoDB
-    result = await mongo_db.turnos.update_one(
-        {"_id": turno_id}, 
-        {"$set": {"estado": "CANCELADO", "updated_at": datetime.now(timezone.utc)}}
-    )
-
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Turno no encontrado o ya cancelado")
-
-    # 3. Notificar vía Redis (Sistema de Eventos - Req 4)
-    canal = "eventos_turnos"
-    mensaje = json.dumps({"evento": "TURNO_CANCELADO", "turno_id": turno_id, "paciente_id": current_user.id})
-    await redis_client.publish(canal, mensaje)
-    
-    return {"status": "turno cancelado exitosamente", "turno_id": turno_id}
-
-
-@app.get("/medicos")
-async def get_all_medicos(current_user: UsuarioEnDB = Depends(get_current_user)):
-    """
-    REQ: Obtiene la lista de todos los médicos registrados.
-    """
-    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-    
-    # La validación de current_user asegura que solo usuarios logueados accedan
-    
-    pipeline = [
-        {"$match": {"roles": "MEDICO"}},
-        {"$project": {
-            "_id": 1, 
-            "nombre": "$pii.nombre",
-            # Nota: la especialidad en el modelo de carga es un campo simple, pero el esquema permite una lista.
-            # Aquí asumimos que está en $medico.perfil.especialidad
-            "especialidad": "$medico.perfil.especialidad" 
-        }}
-    ]
-    try:
-        cursor = mongo_db.usuarios.aggregate(pipeline)
-        medicos = await cursor.to_list(length=None)
-        
-        # Formatear la especialidad si es una lista o nula
-        for medico in medicos:
-             especialidad = medico.get("especialidad")
-             if isinstance(especialidad, list):
-                 medico["especialidad"] = ", ".join(especialidad)
-             elif not especialidad:
-                 # Si el campo no existe o es None/vacío, ponemos un valor por defecto
-                 medico["especialidad"] = "General"
-
-        return parse_json(medicos)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
-    
-
-@app.get("/medico/{medico_id}/turnos_del_dia")
-async def get_turnos_del_dia(medico_id: str, current_user: UsuarioEnDB = Depends(get_current_user)):
-    """
-    Obtiene los turnos programados para el día de hoy del médico especificado.
-    """
-    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
-
-    # Control de acceso: Solo el médico o un administrador pueden ver sus turnos
-    if str(current_user.id) != medico_id and "ADMINISTRADOR" not in current_user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para ver estos turnos")
-    
-    # 1. Calcular el inicio y el fin del día actual en UTC
-    now_utc = datetime.now(timezone.utc)
-    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
-    
-    # 2. Pipeline de agregación
-    pipeline = [
-        {"$match": {
-            "medico_id": medico_id,
-            "ts": {"$gte": today_start, "$lt": today_end}
-        }},
-        {"$sort": {"ts": 1}}, # Ordenar por hora del turno
-        # Buscar la información del paciente
-        {"$lookup": {"from": "usuarios", "localField": "paciente_id", "foreignField": "_id", "as": "paciente_info"}},
-        {"$unwind": {"path": "$paciente_info", "preserveNullAndEmptyArrays": True}},
-        {"$project": {
-            "_id": 1, 
-            "ts": 1, 
-            "estado": 1, 
-            "especialidad": 1, 
-            "sede": 1,
-            "paciente_id": "$paciente_info._id",
-            "paciente_nombre": { "$ifNull": [ "$paciente_info.pii.nombre", "Paciente Eliminado" ] }
-        }}
-    ]
-    
-    try:
-        cursor = mongo_db.turnos.aggregate(pipeline)
-        turnos = await cursor.to_list(length=None)
-        return parse_json(turnos)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener turnos del día: {e}")
-    
 # --- Correr la App ---
 if __name__ == "__main__":
     print("Iniciando API Políglota v4.3.1 (Modelo Rico Corregido) en http://127.0.0.1:8000")

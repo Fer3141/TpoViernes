@@ -206,10 +206,18 @@
         const modalBtnCancel = document.getElementById('modal-btn-cancel');
         let modalConfirmCallback = null;
 
+        // --- Cache de Contenido Original del Modal (AÑADIDO PARA EVITAR RUPTURA) ---
+        const originalModalTitle = modalTitle.textContent;
+        const originalModalMessage = modalMessage.textContent;
+        const originalModalConfirmText = modalBtnConfirm.textContent;
+        // ------------------------------------------------
+
         // --- Lógica del Modal ---
         function showConfirmationModal(title, message, onConfirmCallback) {
+            // Restaura botones/contenido por defecto para confirmación simple
             modalTitle.textContent = title;
             modalMessage.textContent = message;
+            modalBtnConfirm.textContent = originalModalConfirmText; 
             modalConfirmCallback = onConfirmCallback; 
             modal.style.display = 'flex';
             lucide.createIcons(); 
@@ -217,12 +225,17 @@
         function hideModal() {
             modal.style.display = 'none';
             modalConfirmCallback = null;
+            // Restaura la estructura original del modal
+            modalTitle.textContent = originalModalTitle;
+            modalMessage.textContent = originalModalMessage;
+            modalBtnConfirm.textContent = originalModalConfirmText;
         }
         modalBtnCancel.addEventListener('click', hideModal);
         modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
         modalBtnConfirm.addEventListener('click', () => {
             if (modalConfirmCallback) modalConfirmCallback();
-            hideModal();
+            // La ocultación para formularios complejos se maneja en el handler. Para confirmaciones simples, lo hacemos aquí.
+            if (modalTitle.textContent === originalModalTitle) hideModal(); 
         });
 
         // --- Helper de API ---
@@ -296,25 +309,134 @@
             }
         }
 
-        // --- Render Turnos del Día (Médico) ---
+        // --- [CORREGIDO Y AÑADIDO] Render Turnos del Día (Médico) ---
         function renderTurnosDelDia(turnos) {
             const today = new Date().toLocaleDateString('es-AR');
             let html = `<h3 class="text-xl font-semibold text-gray-800">Turnos Programados para Hoy (${today})</h3>`;
             if (turnos.length === 0) { 
                 html += '<p class="mt-4">No tienes turnos programados para hoy.</p>'; 
             } else {
-                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paciente</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { 
+                // AÑADIDO: Columna y botón de Acción
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paciente</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { 
                     const time = new Date(t.ts.$date).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
-                    const estadoClase = t.estado.toUpperCase() === 'PENDIENTE' ? 'text-blue-600' : 'text-gray-500';
+                    const estado = t.estado.toUpperCase();
+                    const estadoClase = estado === 'PENDIENTE' ? 'text-blue-600' : (estado === 'REALIZADO' ? 'text-green-600' : 'text-gray-500');
+                    const turnoId = t._id.$oid || t._id;
+                    const pacienteId = t.paciente_id;
+                    
+                    // Botón para crear visita, solo si el estado es PENDIENTE
+                    const actionButton = estado === 'PENDIENTE' 
+                        ? `<button 
+                            data-turno-id="${turnoId}" 
+                            data-paciente-id="${pacienteId}" 
+                            class="btn-registrar-visita bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-xs font-medium">
+                            Crear Visita
+                          </button>`
+                        : '';
+                    
                     return `<tr>
                         <td class="px-6 py-4 font-semibold">${time}</td>
                         <td class="px-6 py-4">${t.paciente_nombre} (ID: ${t.paciente_id})</td>
                         <td class="px-6 py-4">${t.especialidad}</td>
-                        <td class="px-6 py-4 font-semibold ${estadoClase}">${t.estado.toUpperCase()}</td>
+                        <td class="px-6 py-4 font-semibold ${estadoClase}">${estado}</td>
+                        <td class="px-6 py-4">${actionButton}</td>
                     </tr>`;
                 }).join('')}</tbody></table>`;
             }
             document.getElementById('turnos_dia-content').innerHTML = html;
+            
+            // Adjuntar evento de click al nuevo botón
+            document.querySelectorAll('.btn-registrar-visita').forEach(button => {
+                button.addEventListener('click', showVisitaFormModal);
+            });
+            lucide.createIcons();
+        }
+
+        // --- [NUEVO] Handler para mostrar el formulario de visita en el modal ---
+        function showVisitaFormModal(event) {
+            const button = event.currentTarget;
+            const turnoId = button.dataset.turnoId;
+            const pacienteId = button.dataset.pacienteId;
+
+            // Contenido del formulario de visita
+            const visitFormHTML = `
+                <div class="space-y-4 text-left w-full">
+                    <p class="text-sm text-gray-600">Registrando visita para Paciente ID: <strong>${pacienteId}</strong></p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Diagnóstico(s) (separar por coma):</label>
+                        <input id="visita-diagnosticos" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: Resfrío, Otitis, control">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Notas clínicas:</label>
+                        <textarea id="visita-notas" class="mt-1 block w-full p-2 border rounded-md" rows="3" placeholder="Síntomas, medicación, etc..."></textarea>
+                    </div>
+                    <div id="visita-form-status" class="text-sm hidden"></div>
+                </div>
+            `;
+            
+            // Sobrescribir el contenido del modal
+            modalTitle.textContent = "Registrar Nueva Visita Médica";
+            modalMessage.innerHTML = visitFormHTML;
+            modalBtnConfirm.textContent = "Registrar y Completar Turno";
+
+            // Mostrar el modal
+            modal.style.display = 'flex';
+            lucide.createIcons();
+            
+            // Definir el callback para el botón de confirmar
+            modalConfirmCallback = async () => {
+                const statusDiv = document.getElementById('visita-form-status');
+                statusDiv.classList.remove('hidden');
+                statusDiv.textContent = 'Procesando...';
+                statusDiv.className = 'text-sm text-gray-500 mt-2';
+                
+                const diagnosticosRaw = document.getElementById('visita-diagnosticos').value;
+                const notas = document.getElementById('visita-notas').value;
+                
+                const diagnosticos = diagnosticosRaw.split(',').map(d => d.trim()).filter(d => d.length > 0);
+
+                if (diagnosticos.length === 0) {
+                    statusDiv.textContent = "Error: Debe ingresar al menos un diagnóstico.";
+                    statusDiv.className = 'text-sm text-red-600 mt-2';
+                    return; 
+                }
+
+                // Llamar al handler final
+                handleRegistrarVisita(turnoId, diagnosticos, notas, button);
+                hideModal(); // Ocultar el modal después de iniciar el proceso
+            };
+        }
+
+        // --- [NUEVO] Handler final que llama al endpoint API ---
+        async function handleRegistrarVisita(turnoId, diagnosticos, notas, buttonElement) {
+            buttonElement.textContent = 'Registrando...';
+            buttonElement.disabled = true;
+            
+            try {
+                const body = {
+                    turno_id: turnoId,
+                    diagnosticos: diagnosticos,
+                    notas: notas || null
+                };
+                
+                await fetchApi(`${API_URL}/visitas/registrar_y_completar_turno`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                alert(`Visita registrada con éxito. Turno ${turnoId} marcado como REALIZADO.`);
+                
+                // Refrescar la tabla para mostrar el nuevo estado
+                fetchTurnosDelDia(); 
+
+            } catch (error) {
+                alert(`Error al registrar la visita: ${error.message}`);
+                buttonElement.textContent = 'Crear Visita';
+                buttonElement.disabled = false;
+                // Refrescar de todos modos para mostrar el estado actual
+                fetchTurnosDelDia(); 
+            }
         }
 
         // --- Función para Mostrar/Ocultar pestañas por Rol ---
@@ -338,11 +460,10 @@
             dashboardMedicoScreen.style.display = 'flex';
             dashboardAdminScreen.style.display = 'none';
             
-            setupDashboardForRole(); // <--- CLAVE: Muestra/Oculta pestañas por rol
+            setupDashboardForRole(); // CLAVE: Muestra/Oculta pestañas por rol
             
             if (pacientes && pacientes.length > 0) {
                 pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-                // Si es médico, por defecto selecciona la pestaña de Turnos del Día
                 document.querySelector('.tab-button[data-tab="turnos_dia"]').click(); 
             } else {
                 pacienteSelect.innerHTML = `<option value="">No tiene pacientes con turnos pendientes</option>`;
@@ -393,7 +514,7 @@
             }
         }
         
-        // --- (¡ACTUALIZADO!) Render Perfil (Médico) ---
+        // --- Render Perfil (Médico) ---
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
@@ -457,7 +578,7 @@
             document.getElementById('btn-asignar-riesgo').addEventListener('click', () => handleAsignarRiesgo(red.pacienteId));
         }
         
-        // --- (¡ACTUALIZADO!) Handlers (Médico) ---
+        // --- Handlers (Médico) ---
         
         async function handleGuardarOS(pacienteId) {
             const statusDiv = document.getElementById('os-save-status');
@@ -543,7 +664,7 @@
             );
         }
 
-        // --- (¡ACTUALIZADO!) Handler (Admin) ---
+        // --- Handler (Admin) ---
         async function handleCrearMedico(e) {
             e.preventDefault();
             createMedicoStatus.classList.add('hidden');
@@ -642,7 +763,7 @@
                 document.getElementById(`${targetTab}-content`).classList.remove('hidden');
                 button.classList.add('border-blue-500', 'text-blue-600');
                 
-                // [LÓGICA ACTUALIZADA] Carga específica para Turnos del Día
+                // Lógica de Carga Específica
                 if (targetTab === 'turnos_dia') {
                     fetchTurnosDelDia(); // Carga la lista de turnos del médico para hoy
                 } else {
@@ -658,7 +779,6 @@
         // --- Init ---
         function initApp() {
             lucide.createIcons();
-            // Asegurarse de que el dashboard se configure correctamente si ya hay un token guardado (no cubierto aquí, pero buena práctica)
         }
         initApp();
     </script>
