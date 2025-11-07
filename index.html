@@ -76,6 +76,7 @@
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
                     <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-500 text-blue-600"><i data-lucide="user" class="w-4 h-4"></i><span>Perfil</span></button>
+                    <button id="tab-turnos-dia" data-tab="turnos_dia" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700 hidden"><i data-lucide="calendar-check" class="w-4 h-4"></i><span>Turnos del Día</span></button>
                     <button data-tab="visitas" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clipboard" class="w-4 h-4"></i><span>Visitas</span></button>
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Hábitos</span></button>
                     <button data-tab="red" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="network" class="w-4 h-4"></i><span>Red y Riesgos</span></button>
@@ -84,6 +85,7 @@
                 <div id="content-error" class="text-red-500 hidden"></div>
                 <div id="tab-content">
                     <div id="perfil-content" class="tab-pane"></div>
+                    <div id="turnos_dia-content" class="tab-pane hidden"></div>
                     <div id="visitas-content" class="tab-pane hidden"></div>
                     <div id="habitos-content" class="tab-pane hidden"></div>
                     <div id="red-content" class="tab-pane hidden"></div>
@@ -273,15 +275,75 @@
             }
         }
         
+        // --- Carga de Turnos del Día (Específico para el Médico) ---
+        async function fetchTurnosDelDia() {
+            if (!currentUser || !currentUser._id) return;
+            const medicoId = currentUser._id;
+            const contentDiv = document.getElementById('turnos_dia-content');
+            contentDiv.innerHTML = ''; 
+            loadingSpinner.classList.remove('hidden');
+            contentError.classList.add('hidden');
+            try {
+                const turnos = await fetchApi(`${API_URL}/medico/${medicoId}/turnos_del_dia`);
+                renderTurnosDelDia(turnos);
+            } catch (err) {
+                console.error("Error fetching turnos del día:", err);
+                contentError.textContent = `Error: ${err.message}`;
+                contentDiv.innerHTML = '<p class="text-red-500">Error al cargar los turnos del día.</p>';
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        // --- Render Turnos del Día (Médico) ---
+        function renderTurnosDelDia(turnos) {
+            const today = new Date().toLocaleDateString('es-AR');
+            let html = `<h3 class="text-xl font-semibold text-gray-800">Turnos Programados para Hoy (${today})</h3>`;
+            if (turnos.length === 0) { 
+                html += '<p class="mt-4">No tienes turnos programados para hoy.</p>'; 
+            } else {
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paciente</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { 
+                    const time = new Date(t.ts.$date).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
+                    const estadoClase = t.estado.toUpperCase() === 'PENDIENTE' ? 'text-blue-600' : 'text-gray-500';
+                    return `<tr>
+                        <td class="px-6 py-4 font-semibold">${time}</td>
+                        <td class="px-6 py-4">${t.paciente_nombre} (ID: ${t.paciente_id})</td>
+                        <td class="px-6 py-4">${t.especialidad}</td>
+                        <td class="px-6 py-4 font-semibold ${estadoClase}">${t.estado.toUpperCase()}</td>
+                    </tr>`;
+                }).join('')}</tbody></table>`;
+            }
+            document.getElementById('turnos_dia-content').innerHTML = html;
+        }
+
+        // --- Función para Mostrar/Ocultar pestañas por Rol ---
+        function setupDashboardForRole() {
+            const isMedico = currentUser.roles && currentUser.roles.includes("MEDICO");
+            const turnosDiaTab = document.getElementById('tab-turnos-dia');
+            
+            if (turnosDiaTab) {
+                if (isMedico) {
+                    turnosDiaTab.classList.remove('hidden');
+                } else {
+                    turnosDiaTab.classList.add('hidden');
+                }
+            }
+        }
+        
         // --- Mostrar Dashboards ---
         async function showDashboardMedico(pacientes) {
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
             dashboardMedicoScreen.style.display = 'flex';
             dashboardAdminScreen.style.display = 'none';
+            
+            setupDashboardForRole(); // <--- CLAVE: Muestra/Oculta pestañas por rol
+            
             if (pacientes && pacientes.length > 0) {
                 pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-                await fetchDataForPatient(pacientes[0].id);
+                // Si es médico, por defecto selecciona la pestaña de Turnos del Día
+                document.querySelector('.tab-button[data-tab="turnos_dia"]').click(); 
             } else {
                 pacienteSelect.innerHTML = `<option value="">No tiene pacientes con turnos pendientes</option>`;
                 tabPanes.forEach(pane => pane.innerHTML = '<p>No hay pacientes seleccionados.</p>');
@@ -579,12 +641,24 @@
                 });
                 document.getElementById(`${targetTab}-content`).classList.remove('hidden');
                 button.classList.add('border-blue-500', 'text-blue-600');
+                
+                // [LÓGICA ACTUALIZADA] Carga específica para Turnos del Día
+                if (targetTab === 'turnos_dia') {
+                    fetchTurnosDelDia(); // Carga la lista de turnos del médico para hoy
+                } else {
+                    // Carga normal para pestañas relacionadas con el paciente seleccionado
+                    const selectedPatientId = pacienteSelect.value;
+                    if (selectedPatientId) {
+                        fetchDataForPatient(selectedPatientId); 
+                    }
+                }
             });
         });
 
         // --- Init ---
         function initApp() {
             lucide.createIcons();
+            // Asegurarse de que el dashboard se configure correctamente si ya hay un token guardado (no cubierto aquí, pero buena práctica)
         }
         initApp();
     </script>

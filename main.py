@@ -774,6 +774,8 @@ async def cancelar_turno_paciente(
     await redis_client.publish(canal, mensaje)
     
     return {"status": "turno cancelado exitosamente", "turno_id": turno_id}
+
+
 @app.get("/medicos")
 async def get_all_medicos(current_user: UsuarioEnDB = Depends(get_current_user)):
     """
@@ -809,6 +811,52 @@ async def get_all_medicos(current_user: UsuarioEnDB = Depends(get_current_user))
         return parse_json(medicos)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error de agregación en Mongo: {e}")
+    
+
+@app.get("/medico/{medico_id}/turnos_del_dia")
+async def get_turnos_del_dia(medico_id: str, current_user: UsuarioEnDB = Depends(get_current_user)):
+    """
+    Obtiene los turnos programados para el día de hoy del médico especificado.
+    """
+    if mongo_db is None: raise HTTPException(503, "MongoDB no conectado")
+
+    # Control de acceso: Solo el médico o un administrador pueden ver sus turnos
+    if str(current_user.id) != medico_id and "ADMINISTRADOR" not in current_user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para ver estos turnos")
+    
+    # 1. Calcular el inicio y el fin del día actual en UTC
+    now_utc = datetime.now(timezone.utc)
+    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    
+    # 2. Pipeline de agregación
+    pipeline = [
+        {"$match": {
+            "medico_id": medico_id,
+            "ts": {"$gte": today_start, "$lt": today_end}
+        }},
+        {"$sort": {"ts": 1}}, # Ordenar por hora del turno
+        # Buscar la información del paciente
+        {"$lookup": {"from": "usuarios", "localField": "paciente_id", "foreignField": "_id", "as": "paciente_info"}},
+        {"$unwind": {"path": "$paciente_info", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "_id": 1, 
+            "ts": 1, 
+            "estado": 1, 
+            "especialidad": 1, 
+            "sede": 1,
+            "paciente_id": "$paciente_info._id",
+            "paciente_nombre": { "$ifNull": [ "$paciente_info.pii.nombre", "Paciente Eliminado" ] }
+        }}
+    ]
+    
+    try:
+        cursor = mongo_db.turnos.aggregate(pipeline)
+        turnos = await cursor.to_list(length=None)
+        return parse_json(turnos)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener turnos del día: {e}")
+    
 # --- Correr la App ---
 if __name__ == "__main__":
     print("Iniciando API Políglota v4.3.1 (Modelo Rico Corregido) en http://127.0.0.1:8000")

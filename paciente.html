@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,53 +8,94 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        #dashboard-screen, #confirmation-modal { display: none; }
-        #loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1e40af; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .login-tab.active { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; }
-        .login-tab { border-bottom: 2px solid transparent; }
+        #dashboard-screen,
+        #confirmation-modal {
+            display: none;
+        }
+
+        #loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e40af;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .login-tab.active {
+            border-bottom: 2px solid #1d4ed8;
+            color: #1d4ed8;
+        }
+
+        .login-tab {
+            border-bottom: 2px solid transparent;
+        }
     </style>
 </head>
+
 <body class="bg-gray-100 h-screen">
 
     <div id="login-screen" class="flex items-center justify-center h-full">
         <div class="p-8 bg-white rounded-lg shadow-xl w-96">
             <div class="flex border-b mb-6">
                 <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Ingresar</button>
-                <button id="tab-btn-register" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Registrarse</button>
+                <button id="tab-btn-register"
+                    class="login-tab w-1/2 py-2 font-semibold text-gray-500">Registrarse</button>
             </div>
             <div id="login-pane">
                 <form id="login-form">
                     <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">VidaSana (Paciente)</h2>
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario</label>
-                        <input id="username" type="text" value="ljuan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                        <input id="username" type="text" value="ljuan"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                     </div>
                     <div class="mb-6">
                         <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Contraseña</label>
-                        <input id="password" type="password" value="pass123" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
+                        <input id="password" type="password" value="pass123"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
                     </div>
                     <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
-                    <button type="submit" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
+                    <button type="submit"
+                        class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
                 </form>
             </div>
             <div id="register-pane" class="hidden">
                 <form id="register-form">
                     <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Crear Cuenta Paciente</h2>
                     <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        <input id="username-reg" type="text" placeholder="* Nombre de Usuario" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="password-reg" type="password" placeholder="* Contraseña" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="username-reg" type="text" placeholder="* Nombre de Usuario"
+                            class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="password-reg" type="password" placeholder="* Contraseña"
+                            class="shadow-sm border rounded w-full py-2 px-3" required>
                         <hr>
-                        <input id="nombre-reg" type="text" placeholder="* Nombre Completo" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="dni-reg" type="text" placeholder="* DNI" class="shadow-sm border rounded w-full py-2 px-3" required>
-                        <input id="email-reg" type="email" placeholder="* Email" class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="nombre-reg" type="text" placeholder="* Nombre Completo"
+                            class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="dni-reg" type="text" placeholder="* DNI"
+                            class="shadow-sm border rounded w-full py-2 px-3" required>
+                        <input id="email-reg" type="email" placeholder="* Email"
+                            class="shadow-sm border rounded w-full py-2 px-3" required>
                         <div>
                             <label class="text-sm text-gray-500">* Fecha de Nacimiento</label>
-                            <input id="fecha-nac-reg" type="date" class="shadow-sm border rounded w-full py-2 px-3" required>
+                            <input id="fecha-nac-reg" type="date" class="shadow-sm border rounded w-full py-2 px-3"
+                                required>
                         </div>
-                        <input id="telefono-reg" type="tel" placeholder="Teléfono (ej: +54...)" class="shadow-sm border rounded w-full py-2 px-3">
-                        <input id="direccion-reg" type="text" placeholder="Dirección" class="shadow-sm border rounded w-full py-2 px-3">
-                        <input id="pais-reg" type="text" placeholder="País (ej: AR)" class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="telefono-reg" type="tel" placeholder="Teléfono (ej: +54...)"
+                            class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="direccion-reg" type="text" placeholder="Dirección"
+                            class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="pais-reg" type="text" placeholder="País (ej: AR)"
+                            class="shadow-sm border rounded w-full py-2 px-3">
                         <select id="genero-reg" class="shadow-sm border rounded w-full py-2 px-3 text-gray-500">
                             <option value="">Seleccionar Género (Opcional)</option>
                             <option value="M">Masculino</option>
@@ -61,11 +103,15 @@
                             <option value="O">Otro</option>
                         </select>
                         <hr>
-                        <input id="os-reg" type="text" placeholder="Obra Social (Opcional)" class="shadow-sm border rounded w-full py-2 px-3">
-                        <input id="afiliado-reg" type="text" placeholder="N° de Afiliado (Opcional)" class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="os-reg" type="text" placeholder="Obra Social (Opcional)"
+                            class="shadow-sm border rounded w-full py-2 px-3">
+                        <input id="afiliado-reg" type="text" placeholder="N° de Afiliado (Opcional)"
+                            class="shadow-sm border rounded w-full py-2 px-3">
                     </div>
                     <div id="register-status" class="text-sm my-4 hidden"></div>
-                    <button type="submit" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full mt-4">Crear Cuenta</button>
+                    <button type="submit"
+                        class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded w-full mt-4">Crear
+                        Cuenta</button>
                 </form>
             </div>
         </div>
@@ -75,18 +121,30 @@
         <header class="flex items-center justify-between p-4 bg-white border-b shadow-sm">
             <h1 class="text-2xl font-bold text-blue-800">VidaSana</h1>
             <div class="flex items-center space-x-4">
-                <span class="text-gray-700 hidden sm:block">¡Hola, <span id="user-name" class="font-semibold"></span>!</span>
-                <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                <span class="text-gray-700 hidden sm:block">¡Hola, <span id="user-name"
+                        class="font-semibold"></span>!</span>
+                <button id="logout-button" class="text-gray-500 hover:text-red-600"><i data-lucide="log-out"
+                        class="w-5 h-5"></i></button>
             </div>
         </header>
         <main class="flex-1 flex flex-col p-6 overflow-hidden">
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
-                    <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-700 text-blue-800"><i data-lucide="user" class="w-4 h-4"></i><span>Mi Perfil</span></button>
-                    <button data-tab="registrar" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="edit" class="w-4 h-4"></i><span>Registrar Hábito</span></button>
-                    <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Mis Hábitos</span></button>
-                    <button data-tab="turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
-                    <button data-tab="mis-turnos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clock" class="w-4 h-4"></i><span>Mis Turnos</span></button>
+                    <button data-tab="perfil"
+                        class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-700 text-blue-800"><i
+                            data-lucide="user" class="w-4 h-4"></i><span>Mi Perfil</span></button>
+                    <button data-tab="registrar"
+                        class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i
+                            data-lucide="edit" class="w-4 h-4"></i><span>Registrar Hábito</span></button>
+                    <button data-tab="habitos"
+                        class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i
+                            data-lucide="line-chart" class="w-4 h-4"></i><span>Mis Hábitos</span></button>
+                    <button data-tab="turnos"
+                        class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i
+                            data-lucide="calendar" class="w-4 h-4"></i><span>Sacar Turno</span></button>
+                    <button data-tab="mis-turnos"
+                        class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i
+                            data-lucide="clock" class="w-4 h-4"></i><span>Mis Turnos</span></button>
                 </nav>
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
@@ -112,10 +170,12 @@
                     <p id="modal-message" class="text-gray-600 mt-2"></p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-8">
-                    <button id="modal-btn-cancel" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
+                    <button id="modal-btn-cancel"
+                        class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
                         Cancelar
                     </button>
-                    <button id="modal-btn-confirm" class="py-2 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                    <button id="modal-btn-confirm"
+                        class="py-2 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
                         Sí, Confirmar
                     </button>
                 </div>
@@ -126,7 +186,7 @@
     <script>
         const API_URL = 'http://localhost:8000';
         let currentToken = null;
-        let currentUser = null; 
+        let currentUser = null;
         let currentPacientePerfil = null; // <-- (¡NUEVO!) Caché para guardar el perfil
 
         // --- Selectores ---
@@ -157,7 +217,7 @@
         function showConfirmationModal(title, message, onConfirmCallback) {
             modalTitle.textContent = title;
             modalMessage.textContent = message;
-            modalConfirmCallback = onConfirmCallback; 
+            modalConfirmCallback = onConfirmCallback;
             modal.style.display = 'flex';
             lucide.createIcons();
         }
@@ -249,7 +309,7 @@
                 registerStatus.classList.remove('hidden');
             }
         }
-        
+
         async function showDashboard() {
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
@@ -269,7 +329,7 @@
             if (!currentUser) return;
             const pacienteId = currentUser._id;
             const contentDiv = document.getElementById(`${tabName}-content`);
-            contentDiv.innerHTML = ''; 
+            contentDiv.innerHTML = '';
             loadingSpinner.classList.remove('hidden');
             contentError.classList.add('hidden');
             try {
@@ -284,9 +344,9 @@
                     renderHabitos(habitos);
                 } else if (tabName === 'turnos') {
                     // [¡CORRECCIÓN AQUÍ!] Cargar la lista de médicos antes de renderizar el formulario
-                    const medicos = await fetchApi(`${API_URL}/medicos`); 
+                    const medicos = await fetchApi(`${API_URL}/medicos`);
                     renderFormTurno(medicos);
-                } else if (tabName === 'mis-turnos') { 
+                } else if (tabName === 'mis-turnos') {
                     const turnos = await fetchApi(`${API_URL}/paciente/${pacienteId}/turnos`);
                     renderMisTurnos(turnos);
                 }
@@ -299,67 +359,82 @@
                 lucide.createIcons();
             }
         }
-        
+
         // --- (¡ACTUALIZADO!) Render Perfil (con modo Edición) ---
         function renderPerfil(perfil, isEditing = false) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
             const clinico = p.clinico || {};
-            
+
             let html = '';
+
+            // FUNCIÓN CLAVE PARA EL FORMATO: Devuelve el valor, o el mensaje de acción con CLASES GRISES.
+            const naView = (val, message) => val || `<span class="text-gray-500 font-normal">${message}</span>`;
+            // Función para inputs en modo edición
+            const na = (val) => val || '';
+
+            // --- Definición de Mensajes de Acción ---
+            const MENSAGES = {
+                telefono: "Proporcionar un número de contacto",
+                direccion: "Direccion no registrado (Agregar pais en editar perfil)",
+                pais: "N/A", // Se muestra dentro de Dirección, se mantiene N/A si el país está vacío
+                obra_social: "Agregar obra social en editar perfil",
+                numero_afiliado: "Agregar numero de afiliado",
+                grupo_sanguineo: "Informar Grupo Sanguineo",
+                alergias: "Informar alergias para seguridad",
+            };
 
             if (isEditing) {
                 // --- MODO EDICIÓN ---
-                const na = (val) => val || ''; // Para inputs, usar string vacío
                 html = `
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-semibold text-gray-800">Editar Mi Perfil</h3>
-                    </div>
-                    <div id="perfil-save-status" class="text-sm my-2"></div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <div class="md:col-span-2"><label class="text-sm font-medium text-gray-500">Dirección</label><input id="perfil-direccion" value="${na(pii.direccion)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
-                        <div><label class="text-sm font-medium text-gray-500">Teléfono</label><input id="perfil-telefono" value="${na(pii.telefono)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
-                        <div><label class="text-sm font-medium text-gray-500">País (ej: AR)</label><input id="perfil-pais" value="${na(pii.pais)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
-                        
-                        <div><label class="text-sm font-medium text-gray-500">Obra Social</label><input id="perfil-os" value="${na(p.obra_social)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
-                        <div><label class="text-sm font-medium text-gray-500">N° de Afiliado</label><input id="perfil-afiliado" value="${na(p.numero_afiliado)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800">Editar Mi Perfil</h3>
+            </div>
+            <div id="perfil-save-status" class="text-sm my-2"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div class="md:col-span-2"><label class="text-sm font-medium text-gray-500">Dirección</label><input id="perfil-direccion" value="${na(pii.direccion)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                <div><label class="text-sm font-medium text-gray-500">Teléfono</label><input id="perfil-telefono" value="${na(pii.telefono)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                <div><label class="text-sm font-medium text-gray-500">País (ej: AR)</label><input id="perfil-pais" value="${na(pii.pais)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                
+                <div><label class="text-sm font-medium text-gray-500">Obra Social</label><input id="perfil-os" value="${na(p.obra_social)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
+                <div><label class="text-sm font-medium text-gray-500">N° de Afiliado</label><input id="perfil-afiliado" value="${na(p.numero_afiliado)}" class="shadow-sm border rounded w-full py-2 px-3"></div>
 
-                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="font-semibold">${pii.nombre || 'N/A'}</p></div>
-                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="font-semibold">${pii.dni || 'N/A'}</p></div>
-                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="font-semibold">${pii.email || 'N/A'}</p></div>
-                        <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="font-semibold">${clinico.grupo_sanguineo || 'N/A'}</p></div>
-                    </div>
-                    <div class="flex space-x-4 mt-6">
-                        <button id="btn-save-perfil" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Guardar Cambios</button>
-                        <button id="btn-cancel-perfil" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">Cancelar</button>
-                    </div>
-                `;
+                <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="font-semibold">${pii.nombre || 'N/A'}</p></div>
+                <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="font-semibold">${pii.dni || 'N/A'}</p></div>
+                <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="font-semibold">${pii.email || 'N/A'}</p></div>
+                <div class="bg-gray-100 p-3 rounded-lg"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="font-semibold">${clinico.grupo_sanguineo || 'N/A'}</p></div>
+            </div>
+            <div class="flex space-x-4 mt-6">
+                <button id="btn-save-perfil" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Guardar Cambios</button>
+                <button id="btn-cancel-perfil" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">Cancelar</button>
+            </div>
+        `;
             } else {
-                // --- MODO VISTA ---
-                const naView = (val) => val || '<span class="text-gray-400">N/A</span>';
+                // --- MODO VISTA (con mensajes de acción) ---
                 html = `
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-semibold text-gray-800">Mi Perfil</h3>
-                        <button id="btn-edit-perfil" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded flex items-center space-x-2">
-                            <i data-lucide="edit-2" class="w-4 h-4"></i>
-                            <span>Editar Perfil</span>
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Nombre</h4><p class="text-lg font-semibold">${naView(pii.nombre)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">DNI</h4><p class="text-lg font-semibold">${naView(pii.dni)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="text-lg font-semibold">${naView(pii.email)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Teléfono</h4><p class="text-lg font-semibold">${naView(pii.telefono)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border md:col-span-2"><h4 class="text-sm font-medium text-gray-500">Dirección</h4><p class="text-lg font-semibold">${naView(pii.direccion)} (${naView(pii.pais)})</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold">${naView(p.obra_social)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">N° de Afiliado</h4><p class="text-lg font-semibold">${naView(p.numero_afiliado)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="text-lg font-semibold">${naView(clinico.grupo_sanguineo)}</p></div>
-                        <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${clinico.alergias?.join(', ') || naView(null)}</p></div>
-                    </div>
-                `;
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800">Mi Perfil</h3>
+                <button id="btn-edit-perfil" class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded flex items-center space-x-2">
+                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                    <span>Editar Perfil</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Email</h4><p class="text-lg font-semibold">${pii.email || 'N/A'}</p></div>
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Teléfono</h4><p class="text-lg font-semibold">${naView(pii.telefono, MENSAGES.telefono)}</p></div>
+
+                <div class="bg-gray-50 p-4 rounded-lg border md:col-span-2"><h4 class="text-sm font-medium text-gray-500">Dirección</h4><p class="text-lg font-semibold">${pii.direccion ? `${pii.direccion} (${naView(pii.pais, MENSAGES.pais)})` : naView(null, MENSAGES.direccion)}</p></div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Obra Social</h4><p class="text-lg font-semibold">${naView(p.obra_social, MENSAGES.obra_social)}</p></div>
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">N° de Afiliado</h4><p class="text-lg font-semibold">${naView(p.numero_afiliado, MENSAGES.numero_afiliado)}</p></div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Grupo Sanguíneo</h4><p class="text-lg font-semibold">${naView(clinico.grupo_sanguineo, MENSAGES.grupo_sanguineo)}</p></div>
+                <div class="bg-gray-50 p-4 rounded-lg border"><h4 class="text-sm font-medium text-gray-500">Alergias</h4><p class="text-lg font-semibold">${clinico.alergias?.join(', ') || naView(null, MENSAGES.alergias)}</p></div>
+            </div>
+        `;
             }
             document.getElementById('perfil-content').innerHTML = html;
-            
+
             // Re-adjuntar listeners
             if (isEditing) {
                 document.getElementById('btn-save-perfil').addEventListener('click', handleSavePerfil);
@@ -383,13 +458,13 @@
             document.getElementById('form-habito').addEventListener('submit', handleRegistrarHabito);
         }
         function renderHabitos(habitos) { /* (Sin cambios) */
-             let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Hábitos Registrados</h3>';
+            let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Hábitos Registrados</h3>';
             if (habitos.length === 0) { html += '<p class="mt-4">Aún no has registrado hábitos.</p>'; } else {
-                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${habitos.map(h => `<tr><td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td><td class="px-6 py-4">${h.tipo}</td><td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td></tr>`).join('')}</tbody></table>`;
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${habitos.map(h => `<tr><td class="px-6 py-4">${new Date(h.ts.$date).toLocaleString()}</td><td class="px-6 py-4">${h.tipo}</td><td class="px-6 py-4">${h.valor} ${h.notas ? `(${h.notas})` : ''}</td></tr>`).join('')}</tbody></table>`;
             }
             document.getElementById('habitos-content').innerHTML = html;
         }
-        function renderFormTurno(medicos) { 
+        function renderFormTurno(medicos) {
             const optionsHtml = medicos.map(m => {
                 const especialidad = m.especialidad || 'General';
                 // Añadimos un atributo data-especialidad para obtenerlo fácilmente en el handler
@@ -410,27 +485,27 @@
             `;
             document.getElementById('form-turno').addEventListener('submit', handleSacarTurno);
         }
-        function renderMisTurnos(turnos) { 
+        function renderMisTurnos(turnos) {
             let html = '<h3 class="text-xl font-semibold text-gray-800">Mis Turnos</h3>';
             if (turnos.length === 0) { html += '<p class="mt-4">No tienes turnos registrados.</p>'; } else {
-                 html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { 
-                     const estado = t.estado.toUpperCase();
-                     const estadoClase = estado === 'PENDIENTE' ? 'text-blue-600' : (estado === 'CANCELADO' || estado === 'NO_ASISTIO' ? 'text-red-600' : 'text-gray-500'); 
-                     const actionButton = estado === 'PENDIENTE' 
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => {
+                    const estado = t.estado.toUpperCase();
+                    const estadoClase = estado === 'PENDIENTE' ? 'text-blue-600' : (estado === 'CANCELADO' || estado === 'NO_ASISTIO' ? 'text-red-600' : 'text-gray-500');
+                    const actionButton = estado === 'PENDIENTE'
                         ? `<button data-turno-id="${t._id.$oid || t._id}" class="btn-cancelar-turno bg-red-100 hover:bg-red-200 text-red-700 py-1 px-3 rounded text-xs font-medium">Cancelar</button>`
                         : '';
-                     
-                     return `<tr>
+
+                    return `<tr>
                          <td class="px-6 py-4">${new Date(t.ts.$date).toLocaleString()}</td>
                          <td class="px-6 py-4">${t.medico_nombre || 'N/A'}</td>
                          <td class="px-6 py-4">${t.especialidad}</td>
                          <td class="px-6 py-4 font-semibold ${estadoClase}">${estado}</td>
                          <td class="px-6 py-4">${actionButton}</td>
                      </tr>`;
-                 }).join('')}</tbody></table>`;
+                }).join('')}</tbody></table>`;
             }
             document.getElementById('mis-turnos-content').innerHTML = html;
-            
+
             // Adjuntar evento de click al botón de cancelar
             document.querySelectorAll('.btn-cancelar-turno').forEach(button => {
                 button.addEventListener('click', handleCancelarTurno);
@@ -442,7 +517,7 @@
         async function handleCancelarTurno(event) {
             const turnoId = event.target.dataset.turnoId;
             const boton = event.target;
-            
+
             showConfirmationModal(
                 "¿Confirmar Cancelación?",
                 "Estás a punto de cancelar este turno. ¿Estás seguro de que deseas continuar? Esta acción no se puede revertir.",
@@ -453,10 +528,10 @@
                         await fetchApi(`${API_URL}/turnos/${turnoId}/cancelar`, {
                             method: 'PATCH'
                         });
-                        
+
                         // Recargar la tabla de turnos para mostrar el estado actualizado
-                        await fetchDataForTab('mis-turnos'); 
-                        
+                        await fetchDataForTab('mis-turnos');
+
                     } catch (error) {
                         alert(`Error al cancelar el turno: ${error.message}`);
                         boton.textContent = 'Cancelar';
@@ -471,7 +546,7 @@
         // --- (¡NUEVO!) Handler para Guardar Perfil ---
         async function handleSavePerfil() {
             const statusDiv = document.getElementById('perfil-save-status');
-            
+
             // 1. Recolectar datos del formulario de edición
             const body = {
                 telefono: document.getElementById('perfil-telefono').value || null,
@@ -493,9 +568,9 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(body)
                         });
-                        
+
                         // ¡Éxito! Refrescar la pestaña de perfil
-                        await fetchDataForTab('perfil'); 
+                        await fetchDataForTab('perfil');
 
                     } catch (error) {
                         statusDiv.textContent = `Error: ${error.message}`;
@@ -518,9 +593,9 @@
                     const notas = document.getElementById('habito-notas').value;
                     let valorParseado = (tipo === 'sintoma') ? valor : parseFloat(valor);
                     if (isNaN(valorParseado) && tipo !== 'sintoma') {
-                         statusDiv.textContent = 'El valor debe ser numérico.';
-                         statusDiv.className = 'text-sm mt-2 text-red-600';
-                         return;
+                        statusDiv.textContent = 'El valor debe ser numérico.';
+                        statusDiv.className = 'text-sm mt-2 text-red-600';
+                        return;
                     }
                     statusDiv.textContent = 'Registrando...';
                     try {
@@ -531,7 +606,7 @@
                         });
                         statusDiv.textContent = `¡Hábito '${tipo}' registrado con éxito!`;
                         statusDiv.className = 'text-sm mt-2 text-green-600';
-                        e.target.reset(); 
+                        e.target.reset();
                     } catch (error) {
                         statusDiv.textContent = `Error: ${error.message}`;
                         statusDiv.className = 'text-sm mt-2 text-red-600';
@@ -561,25 +636,25 @@
                     const medico_select = document.getElementById('turno-medico');
                     const medico_id = medico_select.value;
                     // [¡CORRECCIÓN AQUÍ!] Obtener especialidad del data-attribute
-                    const especialidad = medico_select.options[medico_select.selectedIndex].dataset.especialidad; 
+                    const especialidad = medico_select.options[medico_select.selectedIndex].dataset.especialidad;
                     const sede = document.getElementById('turno-sede').value;
 
                     if (!medico_id) {
-                         statusDiv.textContent = 'Debe seleccionar un médico.';
-                         statusDiv.className = 'text-sm mt-2 text-red-600';
-                         return;
+                        statusDiv.textContent = 'Debe seleccionar un médico.';
+                        statusDiv.className = 'text-sm mt-2 text-red-600';
+                        return;
                     }
-                    
+
                     statusDiv.textContent = 'Solicitando...';
                     try {
                         const turno_id = "turno-" + Date.now();
-                        
+
                         await fetchApi(`${API_URL}/turnos`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
+                            body: JSON.stringify({
                                 "_id": turno_id,
-                                "paciente_id": currentUser._id, 
+                                "paciente_id": currentUser._id,
                                 "medico_id": medico_id,
                                 "ts": new Date(ts).toISOString(),
                                 "especialidad": especialidad,
@@ -600,12 +675,12 @@
         // --- Event Listeners ---
         loginForm.addEventListener('submit', handleLogin);
         registerForm.addEventListener('submit', handleRegister);
-        
+
         logoutButton.addEventListener('click', () => {
             showConfirmationModal(
                 "¿Cerrar sesión?",
                 "¿Estás seguro de que deseas cerrar tu sesión actual?",
-                handleLogout 
+                handleLogout
             );
         });
 
@@ -648,4 +723,5 @@
         initApp();
     </script>
 </body>
+
 </html>
