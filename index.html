@@ -75,7 +75,8 @@
             
             <div class="flex-1 p-6 overflow-auto bg-white rounded-lg shadow-lg">
                 <nav class="flex space-x-2 mb-6 border-b border-gray-200">
-                    <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-500 text-blue-600"><i data-lucide="user" class="w-4 h-4"></i><span>Perfil</span></button>
+                    <button id="tab-turnos-dia" data-tab="turnos_dia" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-blue-500 text-blue-600"><i data-lucide="calendar-check" class="w-4 h-4"></i><span>Turnos del Día</span></button>
+                    <button data-tab="perfil" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="user" class="w-4 h-4"></i><span>Perfil Paciente</span></button>
                     <button data-tab="visitas" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="clipboard" class="w-4 h-4"></i><span>Visitas</span></button>
                     <button data-tab="habitos" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="line-chart" class="w-4 h-4"></i><span>Hábitos</span></button>
                     <button data-tab="red" class="tab-button flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-t-md text-gray-500 hover:text-gray-700"><i data-lucide="network" class="w-4 h-4"></i><span>Red y Riesgos</span></button>
@@ -83,7 +84,7 @@
                 <div id="loading-spinner" class="mx-auto hidden"></div>
                 <div id="content-error" class="text-red-500 hidden"></div>
                 <div id="tab-content">
-                    <div id="perfil-content" class="tab-pane"></div>
+                    <div id="turnos_dia-content" class="tab-pane"></div> <div id="perfil-content" class="tab-pane hidden"></div>
                     <div id="visitas-content" class="tab-pane hidden"></div>
                     <div id="habitos-content" class="tab-pane hidden"></div>
                     <div id="red-content" class="tab-pane hidden"></div>
@@ -100,7 +101,6 @@
                 <button id="logout-button-admin" class="logout-btn text-gray-300 hover:text-red-500"><i data-lucide="log-out" class="w-5 h-5"></i></button>
             </div>
         </header>
-
         <main class="flex-1 flex flex-col p-6 overflow-auto">
             <div class="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto w-full">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">Crear Nuevo Médico</h2>
@@ -143,8 +143,8 @@
                     <div class="bg-orange-100 p-3 rounded-full">
                         <i data-lucide="alert-triangle" class="w-8 h-8 text-orange-500"></i>
                     </div>
-                    <h3 id="modal-title" class="text-2xl font-semibold text-gray-800 mt-4">¿Cerrar sesión?</h3>
-                    <p id="modal-message" class="text-gray-600 mt-2">¿Estás seguro de que deseas cerrar tu sesión actual?</p>
+                    <h3 id="modal-title" class="text-2xl font-semibold text-gray-800 mt-4">¿Confirmar Acción?</h3>
+                    <p id="modal-message" class="text-gray-600 mt-2">¿Estás seguro de que deseas continuar?</p>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-8">
                     <button id="modal-btn-cancel" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
@@ -200,25 +200,99 @@
         const modalBtnConfirm = document.getElementById('modal-btn-confirm');
         const modalBtnCancel = document.getElementById('modal-btn-cancel');
         let modalConfirmCallback = null;
+        
+        // Caché de Contenido Original del Modal
+        const originalModalHTML = modal.innerHTML;
 
-        // --- Lógica del Modal ---
+        // --- Lógica del Modal (¡RESTAURADA Y MEJORADA!) ---
         function showConfirmationModal(title, message, onConfirmCallback) {
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
+            // Restaura el modal a su estado de confirmación simple
+            modal.innerHTML = originalModalHTML;
+            // Re-bindea los botones
+            document.getElementById('modal-btn-cancel').addEventListener('click', hideModal);
+            document.getElementById('modal-btn-confirm').addEventListener('click', () => {
+                if (modalConfirmCallback) modalConfirmCallback();
+                hideModal();
+            });
+            modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+
+            // Setea los textos
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
             modalConfirmCallback = onConfirmCallback; 
             modal.style.display = 'flex';
             lucide.createIcons(); 
         }
+
+        // Modal para Formulario de Visita
+        function showVisitaFormModal(event) {
+            const button = event.currentTarget;
+            const turnoId = button.dataset.turnoId;
+            const pacienteId = button.dataset.pacienteId;
+
+            // Sobrescribir el modal con HTML de formulario
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                    <div class="p-6">
+                        <h3 class="text-2xl font-semibold text-gray-800 mt-4 text-center">Registrar Visita</h3>
+                        <div class="space-y-4 text-left w-full mt-6">
+                            <p class="text-sm text-gray-600">Registrando visita para Paciente ID: <strong>${pacienteId}</strong></p>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Diagnóstico(s) (separar por coma):</label>
+                                <input id="visita-diagnosticos" type="text" class="mt-1 block w-full p-2 border rounded-md" placeholder="Ej: Resfrío, Otitis, control" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Notas clínicas:</label>
+                                <textarea id="visita-notas" class="mt-1 block w-full p-2 border rounded-md" rows="3" placeholder="Síntomas, medicación, etc..."></textarea>
+                            </div>
+                            <div id="visita-form-status" class="text-sm hidden"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-8">
+                            <button id="modal-btn-cancel-visita" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
+                                Cancelar
+                            </button>
+                            <button id="modal-btn-confirm-visita" class="py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
+                                Registrar y Completar Turno
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modal.style.display = 'flex';
+            lucide.createIcons();
+            
+            // Re-bindear botones del modal de visita
+            document.getElementById('modal-btn-cancel-visita').addEventListener('click', hideModal);
+            document.getElementById('modal-btn-confirm-visita').addEventListener('click', async () => {
+                const statusDiv = document.getElementById('visita-form-status');
+                statusDiv.classList.remove('hidden');
+                statusDiv.textContent = 'Procesando...';
+                statusDiv.className = 'text-sm text-gray-500 mt-2';
+                
+                const diagnosticosRaw = document.getElementById('visita-diagnosticos').value;
+                const notas = document.getElementById('visita-notas').value;
+                const diagnosticos = diagnosticosRaw.split(',').map(d => d.trim()).filter(d => d.length > 0);
+
+                if (diagnosticos.length === 0) {
+                    statusDiv.textContent = "Error: Debe ingresar al menos un diagnóstico.";
+                    statusDiv.className = 'text-sm text-red-600 mt-2';
+                    return; // No cerrar el modal
+                }
+
+                // Llamar al handler final
+                await handleRegistrarVisita(turnoId, diagnosticos, notas, button);
+                hideModal(); // Cerrar el modal
+            });
+            modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+        }
+
         function hideModal() {
             modal.style.display = 'none';
+            modal.innerHTML = originalModalHTML; // Restaurar el modal original
             modalConfirmCallback = null;
         }
-        modalBtnCancel.addEventListener('click', hideModal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
-        modalBtnConfirm.addEventListener('click', () => {
-            if (modalConfirmCallback) modalConfirmCallback();
-            hideModal();
-        });
+
 
         // --- Helper de API ---
         const fetchApi = async (url, options = {}) => {
@@ -270,20 +344,117 @@
             }
         }
         
-        // --- Mostrar Dashboards---
+        // --- Carga de Turnos del Día ---
+        async function fetchTurnosDelDia() {
+            if (!currentUser || !currentUser._id) return;
+            const medicoId = currentUser._id;
+            const contentDiv = document.getElementById('turnos_dia-content');
+            contentDiv.innerHTML = ''; 
+            loadingSpinner.classList.remove('hidden');
+            contentError.classList.add('hidden');
+            try {
+                const turnos = await fetchApi(`${API_URL}/medico/${medicoId}/turnos_del_dia`);
+                renderTurnosDelDia(turnos);
+            } catch (err) {
+                console.error("Error fetching turnos del día:", err);
+                contentError.textContent = `Error: ${err.message}`;
+                contentDiv.innerHTML = '<p class="text-red-500">Error al cargar los turnos del día.</p>';
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        // --- Render Turnos del Día ---
+        function renderTurnosDelDia(turnos) {
+            const today = new Date().toLocaleDateString('es-AR');
+            let html = `<h3 class="text-xl font-semibold text-gray-800">Turnos Programados para Hoy (${today})</h3>`;
+            if (turnos.length === 0) { 
+                html += '<p class="mt-4">No tienes turnos programados para hoy.</p>'; 
+            } else {
+                html += `<table class="min-w-full divide-y divide-gray-200 mt-4 border rounded-lg"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paciente</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Especialidad</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${turnos.map(t => { 
+                    const time = new Date(t.ts.$date).toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
+                    const estado = t.estado.toUpperCase();
+                    const estadoClase = estado === 'PENDIENTE' ? 'text-blue-600' : (estado === 'REALIZADO' ? 'text-green-600' : 'text-gray-500');
+                    const turnoId = t._id.$oid || t._id;
+                    const pacienteId = t.paciente_id;
+                    const actionButton = estado === 'PENDIENTE' 
+                        ? `<button data-turno-id="${turnoId}" data-paciente-id="${pacienteId}" class="btn-registrar-visita bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-xs font-medium">Crear Visita</button>`
+                        : (t.visita_id ? `Visita: ${t.visita_id.slice(0,10)}...` : '');
+                    
+                    return `<tr>
+                        <td class="px-6 py-4 font-semibold">${time}</td>
+                        <td class="px-6 py-4">${t.paciente_nombre}</td>
+                        <td class="px-6 py-4">${t.especialidad}</td>
+                        <td class="px-6 py-4 font-semibold ${estadoClase}">${estado}</td>
+                        <td class="px-6 py-4">${actionButton}</td>
+                    </tr>`;
+                }).join('')}</tbody></table>`;
+            }
+            document.getElementById('turnos_dia-content').innerHTML = html;
+            
+            document.querySelectorAll('.btn-registrar-visita').forEach(button => {
+                button.addEventListener('click', showVisitaFormModal);
+            });
+            lucide.createIcons();
+        }
+
+        // --- Handler Registrar Visita ---
+        async function handleRegistrarVisita(turnoId, diagnosticos, notas, buttonElement) {
+            buttonElement.textContent = 'Registrando...';
+            buttonElement.disabled = true;
+            try {
+                const body = {
+                    turno_id: turnoId,
+                    diagnosticos: diagnosticos,
+                    notas: notas || null
+                };
+                await fetchApi(`${API_URL}/visitas/registrar_y_completar_turno`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                alert(`Visita registrada con éxito. Turno ${turnoId} marcado como REALIZADO.`);
+                fetchTurnosDelDia(); 
+            } catch (error) {
+                alert(`Error al registrar la visita: ${error.message}`);
+                buttonElement.textContent = 'Crear Visita';
+                buttonElement.disabled = false;
+                fetchTurnosDelDia(); 
+            }
+        }
+        
+        // ---  Lógica para mostrar Pestaña "Turnos del Día" ---
+        function setupDashboardForRole() {
+            const isMedico = currentUser.roles && currentUser.roles.includes("MEDICO");
+            const turnosDiaTab = document.getElementById('tab-turnos-dia');
+            
+            if (turnosDiaTab) {
+                if (isMedico) {
+                    turnosDiaTab.classList.remove('hidden');
+                } else {
+                    turnosDiaTab.classList.add('hidden');
+                }
+            }
+        }
+        
+        // --- Mostrar Dashboards ---
         async function showDashboardMedico(pacientes) {
             userName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
             loginScreen.style.display = 'none';
             dashboardMedicoScreen.style.display = 'flex';
             dashboardAdminScreen.style.display = 'none';
+            
+            setupDashboardForRole(); 
+            
             if (pacientes && pacientes.length > 0) {
                 pacienteSelect.innerHTML = pacientes.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-                await fetchDataForPatient(pacientes[0].id);
             } else {
                 pacienteSelect.innerHTML = `<option value="">No tiene pacientes con turnos pendientes</option>`;
-                tabPanes.forEach(pane => pane.innerHTML = '<p>No hay pacientes seleccionados.</p>');
                 loadingSpinner.classList.add('hidden');
             }
+            // Clic por defecto en Turnos del Día
+            document.querySelector('.tab-button[data-tab="turnos_dia"]').click();
         }
         async function showDashboardAdmin() {
             adminUserName.textContent = currentUser?.pii?.nombre || currentUser?.auth?.username;
@@ -317,7 +488,6 @@
                 renderVisitas(visitas);
                 renderHabitos(habitos);
                 renderRed(red);
-                
             } catch (err) {
                 console.error("Error fetching data:", err);
                 contentError.textContent = `Error: ${err.message}`;
@@ -328,7 +498,7 @@
             }
         }
         
-        // --- Render Perfil (Médico)---
+        // --- Render Perfil (Médico) ---
         function renderPerfil(perfil) {
             const p = perfil.paciente || {};
             const pii = perfil.pii || {};
@@ -371,14 +541,12 @@
             }
             document.getElementById('habitos-content').innerHTML = html;
         }
-
         // --- Render Red y Riesgos (Médico) ---
-        function renderRed(red) { // Se eliminó el parámetro 'riesgos'
+        function renderRed(red) { 
             const redHtml = (red?.medicos_tratantes.length > 0) ? `<ul class="list-disc list-inside">${red.medicos_tratantes.map(m => `<li>${m.nombre_medico} (${m.rol})</li>`).join('')}</ul>` : 'Sin datos de red.';
-        
             const riesgoFamiliarHtml = `
                 <div class="p-4 bg-red-50 border border-red-200 rounded-lg mt-2">
-                    <h4 class="font-semibold text-red-700 mb-2">Buscar Riesgo en Familiares :</h4>
+                    <h4 class="font-semibold text-red-700 mb-2">Buscar Riesgo en Familiares (Neo4j):</h4>
                     <div class="flex space-x-2">
                         <input id="input-riesgo-familiar" type="text" placeholder="Ej: diabetes" class="w-full p-2 border rounded-md">
                         <button id="btn-buscar-riesgo-familiar" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded">Buscar</button>
@@ -386,27 +554,23 @@
                     <div id="riesgo-familiar-resultado" class="mt-2 text-sm"></div>
                 </div>
             `;
-            
             document.getElementById('red-content').innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-6">
-                        <div><h3 class="text-xl font-semibold">Red de Cuidado</h3><div class="p-4 bg-gray-50 rounded-lg border mt-2"><h4 class="font-semibold mb-2">Médicos Tratantes:</h4>${redHtml}</div></div>
+                        <div><h3 class="text-xl font-semibold">Red de Cuidado</h3><div class="p-4 bg-gray-50 rounded-lg border mt-2"><h4 class="font-semibold mb-2">Médicos Tratantes (Neo4j):</h4>${redHtml}</div></div>
                         <div><h3 class="text-xl font-semibold">Riesgos Familiares</h3>${riesgoFamiliarHtml}</div>
                     </div>
                     <div class="space-y-6">
-                         <div><h3 class="text-xl font-semibold">Cálculo de Riesgo </h3><div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Selecciona un riesgo para calcularlo.</p><select id="select-riesgo-tipo" class="mb-2 w-full p-2 border rounded-md"><option value="diabetes">Diabetes</option><option value="hipertension">Hipertensión</option></select><button id="btn-calcular-riesgo" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Calcular Riesgo (POST)</button><div id="riesgo-calculado-resultado" class="mt-4"></div></div></div>
-                         <div><h3 class="text-xl font-semibold">Asignación de Riesgo </h3><div class="p-4 bg-gray-50 border rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Asigna un diagnóstico permanente al paciente.</p><div class="flex space-x-2"><input id="input-asignar-riesgo" type="text" placeholder="Ej: diabetes" class="w-full p-2 border rounded-md"><button id="btn-asignar-riesgo" class="bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded">Asignar</button></div><div id="asignar-riesgo-status" class="mt-2 text-sm"></div></div></div>
+                         <div><h3 class="text-xl font-semibold">Cálculo de Riesgo (Mongo)</h3><div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Selecciona un riesgo para calcularlo.</p><select id="select-riesgo-tipo" class="mb-2 w-full p-2 border rounded-md"><option value="diabetes">Diabetes</option><option value="hipertension">Hipertensión</option></select><button id="btn-calcular-riesgo" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Calcular Riesgo (POST)</button><div id="riesgo-calculado-resultado" class="mt-4"></div></div></div>
+                         <div><h3 class="text-xl font-semibold">Asignación de Riesgo (Neo4j)</h3><div class="p-4 bg-gray-50 border rounded-lg mt-2"><p class="text-sm text-gray-600 mb-4">Asigna un diagnóstico permanente al paciente.</p><div class="flex space-x-2"><input id="input-asignar-riesgo" type="text" placeholder="Ej: diabetes" class="w-full p-2 border rounded-md"><button id="btn-asignar-riesgo" class="bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded">Asignar</button></div><div id="asignar-riesgo-status" class="mt-2 text-sm"></div></div></div>
                     </div>
                 </div>`;
-            
-            //Adjuntar todos los listeners de esta pestaña
             document.getElementById('btn-buscar-riesgo-familiar').addEventListener('click', () => handleBuscarRiesgoFamiliar(red.pacienteId));
             document.getElementById('btn-calcular-riesgo').addEventListener('click', () => handleCalcularRiesgo(red.pacienteId));
             document.getElementById('btn-asignar-riesgo').addEventListener('click', () => handleAsignarRiesgo(red.pacienteId));
         }
         
         // --- Handlers (Médico) ---
-        
         async function handleGuardarOS(pacienteId) {
             const statusDiv = document.getElementById('os-save-status');
             const os = document.getElementById('input-obra-social').value;
@@ -431,23 +595,16 @@
                 }
             );
         }
-
-        // --- Handler Calcular Riesgo (para Bug Duplicado) ---
         async function handleCalcularRiesgo(pacienteId) {
             const resultadoDiv = document.getElementById('riesgo-calculado-resultado');
             const boton = document.getElementById('btn-calcular-riesgo');
             const riesgoTipo = document.getElementById('select-riesgo-tipo').value;
-            
-            // Escribir directamente en el div
             resultadoDiv.className = 'text-gray-500 p-3';
             resultadoDiv.textContent = `Calculando ${riesgoTipo}...`;
             boton.disabled = true;
-
             try {
                 const data = await fetchApi(`${API_URL}/paciente/${pacienteId}/calcular_riesgo?riesgo=${riesgoTipo}`, { method: 'POST' });
                 let color = {"bajo": "text-green-700", "medio": "text-yellow-700", "alto": "text-red-700"}[data.score] || "text-gray-700";
-                
-                // Escribir resultado
                 resultadoDiv.className = `p-3 border rounded-md bg-gray-50`;
                 resultadoDiv.innerHTML = `
                     <p class="font-semibold">Resultado: ${data.tipo.charAt(0).toUpperCase() + data.tipo.slice(1)}</p>
@@ -456,14 +613,12 @@
                     <p class="text-xs text-gray-400 mt-2">Calculado: ${new Date(data.calculado_en).toLocaleString()}</p>
                 `;
             } catch (error) {
-                // Escribir error
                 resultadoDiv.className = 'p-3 border rounded-md bg-red-50 text-red-700';
                 resultadoDiv.innerHTML = `<p><strong>Error al calcular ${riesgoTipo}:</strong> ${error.message}</p>`;
             } finally {
                 boton.disabled = false;
             }
         }
-
         async function handleAsignarRiesgo(pacienteId) {
             const statusDiv = document.getElementById('asignar-riesgo-status');
             const input = document.getElementById('input-asignar-riesgo');
@@ -498,27 +653,22 @@
                 }
             );
         }
-
-        // --- Handler para Buscar Riesgo Familiar ---
+        // ---Handler Buscar Riesgo Familiar ---
         async function handleBuscarRiesgoFamiliar(pacienteId) {
             const resultadoDiv = document.getElementById('riesgo-familiar-resultado');
             const input = document.getElementById('input-riesgo-familiar');
             const boton = document.getElementById('btn-buscar-riesgo-familiar');
             const riesgoTipo = input.value.trim().toLowerCase();
-
             if (!riesgoTipo) {
                 resultadoDiv.textContent = 'Por favor, ingresa un riesgo a buscar (ej: diabetes).';
                 resultadoDiv.className = 'mt-2 text-sm text-red-600';
                 return;
             }
-
             resultadoDiv.textContent = 'Buscando...';
             resultadoDiv.className = 'mt-2 text-sm text-gray-500';
             boton.disabled = true;
-
             try {
                 const data = await fetchApi(`${API_URL}/paciente/${pacienteId}/familiares_con_riesgo?riesgo=${riesgoTipo}`);
-                
                 if (data.familiares_con_riesgo.length > 0) {
                     resultadoDiv.innerHTML = `<p class="font-semibold text-red-700">¡Riesgo '${riesgoTipo}' detectado!</p>
                         <ul class="list-disc list-inside">
@@ -536,7 +686,6 @@
                 boton.disabled = false;
             }
         }
-
         // --- Handler (Admin) ---
         async function handleCrearMedico(e) {
             e.preventDefault();
@@ -544,7 +693,6 @@
             const form = e.target;
             const submitButton = form.querySelector('button[type="submit"]');
             const nombreMedico = document.getElementById('medico-nombre').value;
-            
             showConfirmationModal(
                 "¿Crear Médico?",
                 `¿Estás seguro de que deseas crear al médico ${nombreMedico}?`,
@@ -595,7 +743,7 @@
             );
         }
 
-        // --- Event Listeners ---
+        // --- Event Listeners  ---
         loginForm.addEventListener('submit', (e) => handleLogin(e, 'medico'));
         adminLoginForm.addEventListener('submit', (e) => handleLogin(e, 'admin'));
         createMedicoForm.addEventListener('submit', handleCrearMedico);
@@ -632,6 +780,7 @@
 
         // Pestañas de Dashboard (Médico)
         pacienteSelect.addEventListener('change', (e) => {
+            // Cuando cambias de paciente, vuelve a la pestaña de perfil por defecto
             const targetTab = 'perfil';
             tabButtons.forEach(btn => {
                 btn.classList.remove('border-blue-500', 'text-blue-600');
@@ -647,24 +796,32 @@
             fetchDataForPatient(e.target.value);
         });
         
+        //Lógica de clic en Pestañas del Dashboard
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const targetTab = button.dataset.tab;
+                
+                // Ocultar/Mostrar Paneles
                 tabPanes.forEach(pane => pane.classList.add('hidden'));
+                document.getElementById(`${targetTab}-content`).classList.remove('hidden');
+                
+                // Estilo de Pestañas
                 tabButtons.forEach(btn => {
                     btn.classList.remove('border-blue-500', 'text-blue-600');
                     btn.classList.add('text-gray-500');
                 });
-                document.getElementById(`${targetTab}-content`).classList.remove('hidden');
                 button.classList.add('border-blue-500', 'text-blue-600');
                 
+                // Carga de datos específica por pestaña
                 const selectedPatientId = pacienteSelect.value;
-                if (targetTab === 'perfil' || targetTab === 'visitas' || targetTab === 'habitos' || targetTab === 'red') {
-                    if (selectedPatientId) {
-                        fetchDataForPatient(selectedPatientId);
-                    } else {
-                        document.getElementById(`${targetTab}-content`).innerHTML = '<p>Por favor, selecciona un paciente.</p>';
-                    }
+                if (targetTab === 'turnos_dia') {
+                    fetchTurnosDelDia(); // Carga turnos del MÉDICO
+                } else if (selectedPatientId) {
+                    // Carga datos del PACIENTE seleccionado
+                    fetchDataForPatient(selectedPatientId); 
+                } else if (targetTab !== 'turnos_dia') {
+                    // Si no hay paciente y no es la pestaña de turnos del día
+                    document.getElementById(`${targetTab}-content`).innerHTML = '<p>Por favor, selecciona un paciente de la lista.</p>';
                 }
             });
         });
