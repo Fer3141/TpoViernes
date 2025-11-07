@@ -20,15 +20,15 @@
         <div class="p-8 bg-white rounded-lg shadow-xl w-96">
             
             <div class="flex border-b mb-6">
-                <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Ingresar (Médico)</button>
-                <button id="tab-btn-admin" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Admin</button>
+                <button id="tab-btn-login" class="login-tab active w-1/2 py-2 font-semibold">Médico</button>
+                <button id="tab-btn-admin" class="login-tab w-1/2 py-2 font-semibold text-gray-500">Administrador</button>
             </div>
 
             <div id="login-pane">
                 <form id="login-form">
-                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Acceso Profesional</h2>
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Iniciar sesión</h2>
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario (Médico)</label>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Usuario</label>
                         <input id="username" type="text" value="agomez" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                     </div>
                     <div class="mb-6">
@@ -42,9 +42,9 @@
 
             <div id="admin-pane" class="hidden">
                 <form id="admin-login-form">
-                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Panel Administrador</h2>
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Iniciar sesión</h2>
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="admin-username">Usuario (Admin)</label>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="admin-username">Usuario</label>
                         <input id="admin-username" type="text" value="admin" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                     </div>
                     <div class="mb-6">
@@ -52,7 +52,7 @@
                         <input id="admin-password" type="password" value="adminpass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3">
                     </div>
                     <div id="admin-login-error" class="text-red-500 text-sm mb-4 hidden"></div>
-                    <button type="submit" class="bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar como Admin</button>
+                    <button type="submit" class="bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded w-full">Ingresar</button>
                 </form>
             </div>
         </div>
@@ -668,6 +668,10 @@
         async function handleCrearMedico(e) {
             e.preventDefault();
             createMedicoStatus.classList.add('hidden');
+            
+            const form = e.target;
+            const submitButton = form.querySelector('button[type="submit"]');
+            
             const nombreMedico = document.getElementById('medico-nombre').value;
             
             showConfirmationModal(
@@ -697,6 +701,10 @@
                     createMedicoStatus.textContent = "Creando médico...";
                     createMedicoStatus.className = 'text-sm mb-4 text-gray-500';
                     createMedicoStatus.classList.remove('hidden');
+
+                    submitButton.disabled = true;
+                    submitButton.textContent = "Creando...";
+                    
                     try {
                         const data = await fetchApi(`${API_URL}/admin/crear_medico`, {
                             method: 'POST',
@@ -710,6 +718,9 @@
                         console.error("Error creando médico:", error);
                         createMedicoStatus.textContent = `Error: ${error.message}`;
                         createMedicoStatus.className = 'text-sm mb-4 text-red-600';
+                    } finally {
+                        submitButton.disabled = false;
+                        submitButton.textContent = "Crear Médico";
                     }
                 }
             );
